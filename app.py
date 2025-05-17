@@ -4,6 +4,8 @@ import plotly.express as px
 import calendar
 import io
 from fpdf import FPDF
+import plotly.graph_objects as go
+import plotly.express as px
 
 st.set_page_config(page_title="PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -46,33 +48,31 @@ def calculate_seasonality(df):
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
     return monthly_avg_by_month
 
-def plot_price_chart(df, stock_name):
-    df_reset = df.reset_index()
-    fig = px.line(df_reset, x='Date', y='Price', title=f'{stock_name} - Closing Price Over Time',
-                  labels={'Price': 'Price', 'Date': 'Date'},
-                  template='plotly_dark',
-                  color_discrete_sequence=['#00FFFF'])  # Cyan color
-    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
-                      font_color='white')
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(gridcolor='rgba(255,255,255,0.15)')  # 15% opacity grid lines
+# Price chart with crosshair and zoom
+def plot_price_chart_plotly(df, stock_name):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df.index, y=df['Price'], mode='lines', line=dict(color='cyan'), name='Closing Price'))
+    fig.update_layout(
+        title=f'{stock_name} - Closing Price Over Time',
+        xaxis_title='Date',
+        yaxis_title='Price',
+        template='plotly_dark',
+        hovermode='x unified',
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-def plot_seasonality_chart(monthly_avg_by_month, stock_name):
-    # Prepare DataFrame for Plotly
-    df_season = monthly_avg_by_month.rename_axis('Month').reset_index()
-    df_season['Month Name'] = df_season['Month'].apply(lambda x: calendar.month_abbr[x])
-
-    fig = px.line(df_season, x='Month Name', y='Daily Return %',
-                  title=f'{stock_name} - Average Monthly Return (%)',
-                  labels={'Daily Return %': 'Avg Return %', 'Month Name': 'Month'},
-                  markers=True,
-                  template='plotly_dark',
-                  color_discrete_sequence=['#32CD32'])  # Lime green
-    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
-                      font_color='white')
-    fig.update_xaxes(showgrid=False)
-    fig.update_yaxes(gridcolor='rgba(255,255,255,0.15)')
+# Seasonality chart with crosshair and zoom
+def plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name):
+    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=months, y=monthly_avg_by_month.values, mode='lines+markers', line=dict(color='lime'), name='Avg Monthly Return %'))
+    fig.update_layout(
+        title=f'{stock_name} - Avg Monthly Return (%)',
+        xaxis_title='Month',
+        yaxis_title='Avg Return %',
+        template='plotly_dark',
+        hovermode='x unified',
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_seasonality_heatmap(df, stock_name):
