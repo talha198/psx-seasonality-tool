@@ -117,8 +117,8 @@ if uploaded_file:
     tab1, tab2, tab3 = st.tabs(["📈 Charts", "🌡️ Heatmap", "📤 Export Report"])
 
     with tab1:
-        plot_price_chart(df, stock_name)
-        plot_seasonality_chart(monthly_avg_by_month, stock_name)
+        plot_price_chart_plotly(df, stock_name)
+        plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name)
 
     with tab2:
         plot_seasonality_heatmap(df, stock_name)
@@ -126,7 +126,6 @@ if uploaded_file:
     with tab3:
         st.subheader("📥 Download Seasonality Report")
 
-        # Prepare Excel for download
         excel_data = to_excel(monthly_avg_by_month.rename_axis('Month').reset_index())
         st.download_button(
             label="📊 Download Excel",
@@ -134,16 +133,3 @@ if uploaded_file:
             file_name=f"{stock_name}_seasonality.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
-# ------------------ Upcoming Features ------------------
-with st.expander("🚀 Upcoming Features"):
-    st.markdown("""
-    - 📍 Interactive tooltips and animations  
-    - 📊 Multi-stock dynamic comparison  
-    - 🔔 Buy/Sell signal generator  
-    - 📅 Date range filters  
-    - 🧠 Machine-learning-based pattern detection  
-    - 📈 Seasonality correlation clusters  
-    - 🧪 Backtesting tool for seasonal strategies  
-    - 🔗 API integrations and PSX screener  
-    """)
