@@ -79,10 +79,14 @@ if uploaded_file:
         monthly_avg = df['Daily Return %'].resample('ME').mean()
         monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
 
-        # Plot using matplotlib + seaborn
+        # Plot using matplotlib + seaborn with dark backgrounds
         fig, axs = plt.subplots(2, 1, figsize=(12, 10), constrained_layout=True)
 
-        # Closing price over time
+        # Set figure facecolor (background) to dark
+        fig.patch.set_facecolor('#0b1117')
+
+        # Closing price plot
+        axs[0].set_facecolor('#0b1117')  # dark background for plot area
         axs[0].plot(df.index, df['Price'], color='#61dafb', label='Closing Price')
         axs[0].set_title('Closing Price Over Time', color='#61dafb')
         axs[0].set_xlabel('Date', color='#a0c4ff')
@@ -90,26 +94,31 @@ if uploaded_file:
         axs[0].legend(facecolor='#1b263b', edgecolor='#61dafb')
         axs[0].grid(True, color='#3a5068')
 
-        # Average monthly return seasonality
+        # Average monthly return seasonality plot
+        axs[1].set_facecolor('#0b1117')
         sns.lineplot(
-            x=monthly_avg_by_month.index - 1, 
-            y=monthly_avg_by_month.values, 
-            marker='o', 
-            color='#61dafb', 
+            x=monthly_avg_by_month.index - 1,
+            y=monthly_avg_by_month.values,
+            marker='o',
+            color='#61dafb',
             ax=axs[1]
         )
         axs[1].set_title('Average Monthly Return (%) - Seasonality', color='#61dafb')
         axs[1].set_xlabel('Month', color='#a0c4ff')
         axs[1].set_ylabel('Average Return %', color='#a0c4ff')
         axs[1].set_xticks(range(0, 12))
-        axs[1].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], color='#a0c4ff')
+        axs[1].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], color='#a0c4ff')
         axs[1].grid(True, color='#3a5068')
 
-        # Style axis tick labels color
+        # Style axis tick labels and spines color for all axes
         for ax in axs:
             ax.tick_params(axis='x', colors='#a0c4ff')
             ax.tick_params(axis='y', colors='#a0c4ff')
-            ax.set_facecolor('#0b1117')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['bottom'].set_color('#3a5068')
+            ax.spines['left'].set_color('#3a5068')
 
         # Show plots in Streamlit
         st.pyplot(fig)
