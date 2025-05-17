@@ -67,11 +67,10 @@ if uploaded_files:
         monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
         stock_data[file.name] = monthly_avg_by_month
 
+    # Single stock selection & plot
     stock_selected = st.selectbox("Select stock to view seasonality:", list(stock_data.keys()))
-
     monthly_avg_by_month = stock_data[stock_selected]
 
-    # Plot seasonality for selected stock
     fig, ax = plt.subplots(figsize=(10,5))
     sns.lineplot(
         x=monthly_avg_by_month.index - 1, 
@@ -97,7 +96,7 @@ if uploaded_files:
 
     st.pyplot(fig)
 
-    # Export buttons
+    # Export buttons for selected stock
     col1, col2 = st.columns(2)
 
     with col1:
@@ -118,13 +117,48 @@ if uploaded_files:
             mime="application/pdf"
         )
 
+    st.markdown("---")
+
+    # Multi-stock side-by-side comparison chart
+    st.subheader("Multi-Stock Seasonality Comparison")
+    fig2, ax2 = plt.subplots(figsize=(12, 6))
+
+    # Assign a color palette
+    palette = sns.color_palette("tab10", n_colors=len(stock_data))
+
+    for idx, (stock_name, monthly_avg) in enumerate(stock_data.items()):
+        ax2.plot(
+            monthly_avg.index - 1, 
+            monthly_avg.values, 
+            marker='o', 
+            label=stock_name, 
+            color=palette[idx]
+        )
+
+    ax2.set_title("Average Monthly Return (%) - Multi-Stock Comparison", color='white')
+    ax2.set_xlabel("Month", color='white')
+    ax2.set_ylabel("Average Return %", color='white')
+    ax2.set_xticks(range(0,12))
+    ax2.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], color='white')
+    ax2.grid(True, color='gray')
+    ax2.spines['bottom'].set_color('white')
+    ax2.spines['top'].set_color('white') 
+    ax2.spines['right'].set_color('white')
+    ax2.spines['left'].set_color('white')
+    ax2.tick_params(axis='x', colors='white')
+    ax2.tick_params(axis='y', colors='white')
+    fig2.patch.set_facecolor('#0E1117')  # dark background
+    ax2.set_facecolor('#0E1117')  # dark background
+    ax2.legend(facecolor='#0E1117', edgecolor='white', labelcolor='white')
+
+    st.pyplot(fig2)
+
 else:
     st.info("Upload one or more CSV files to start analyzing seasonality.")
 
 st.markdown("---")
 st.subheader("Upcoming Features")
 st.markdown("""
-- Multi-stock side-by-side comparison charts  
 - Interactive charts with tooltips and zoom  
 - Portfolio watchlist with aggregate seasonality view  
 - Risk-adjusted seasonality metrics  
