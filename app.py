@@ -50,7 +50,7 @@ if uploaded_files:
     axs[0].grid(True, color='#444444', linestyle='--', alpha=0.7)
     axs[0].set_facecolor('#121212')
     for spine in axs[0].spines.values():
-        spine.set_edgecolor('#444444')
+        spine.set_color('#121212')  # hides spines
 
     # Average Monthly Return Seasonality
     sns.lineplot(x=monthly_avg_by_month.index - 1, y=monthly_avg_by_month.values,
@@ -65,7 +65,7 @@ if uploaded_files:
     axs[1].grid(True, color='#444444', linestyle='--', alpha=0.7)
     axs[1].set_facecolor('#121212')
     for spine in axs[1].spines.values():
-        spine.set_edgecolor('#444444')
+        spine.set_color('#121212')  # hides spines
 
     # Seasonality Heatmap: Year-wise Monthly Returns
     df['Year'] = df.index.year
@@ -73,10 +73,12 @@ if uploaded_files:
     monthly_returns = df.groupby(['Year', 'Month'])['Daily Return %'].mean().unstack()
     monthly_returns = monthly_returns.reindex(columns=range(1,13))
 
-    sns.heatmap(monthly_returns, cmap='RdYlGn', center=0, annot=True, fmt=".2f",
-                cbar_kws={'label': 'Average Monthly Return (%)'},
-                linewidths=0.3, linecolor='#333333', ax=axs[2])
-
+    sns.heatmap(
+        monthly_returns, cmap='RdYlGn', center=0, annot=True, fmt=".2f",
+        cbar_kws={'label': 'Average Monthly Return (%)'},
+        linewidths=0.5, linecolor='#121212',  # same as background to hide white borders
+        ax=axs[2]
+    )
     axs[2].set_title(f'{selected_stock} - Year-wise Monthly Return Heatmap', color='white')
     axs[2].set_xlabel('Month', color='white')
     axs[2].set_ylabel('Year', color='white')
@@ -84,8 +86,10 @@ if uploaded_files:
                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], rotation=45, ha='right', color='white')
     axs[2].tick_params(axis='y', colors='white')
     axs[2].tick_params(axis='x', colors='white')
+
     for spine in axs[2].spines.values():
-        spine.set_edgecolor('#333333')
+        spine.set_visible(False)  # hides heatmap spines
+
     axs[2].set_facecolor('#121212')
 
     plt.tight_layout()
