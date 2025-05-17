@@ -19,11 +19,9 @@ uploaded_files = st.file_uploader(
     type=['csv'], accept_multiple_files=True)
 
 if uploaded_files:
-    # Dictionary to store dataframes for each stock
     stock_dfs = {}
     for file in uploaded_files:
         df = pd.read_csv(file)
-        # Basic preprocessing
         df['Date'] = pd.to_datetime(df['Date'], dayfirst=False)
         df = df.sort_values('Date')
         df.set_index('Date', inplace=True)
@@ -31,19 +29,14 @@ if uploaded_files:
         stock_name = file.name.replace('.csv','')
         stock_dfs[stock_name] = df
 
-    # Stock selector for individual analysis
     selected_stock = st.selectbox("Select Stock to Analyze", options=list(stock_dfs.keys()))
 
     df = stock_dfs[selected_stock]
 
-    # Calculate daily returns in %
     df['Daily Return %'] = df['Price'].pct_change() * 100
 
-    # Monthly average return for seasonality line chart
     monthly_avg = df['Daily Return %'].resample('ME').mean()
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
-
-    # ----------------- PLOTTING --------------------
 
     fig, axs = plt.subplots(3, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [2, 2, 3]})
 
@@ -54,8 +47,10 @@ if uploaded_files:
     axs[0].set_ylabel('Price', color='white')
     axs[0].tick_params(axis='x', colors='white')
     axs[0].tick_params(axis='y', colors='white')
-    axs[0].grid(True, color='gray', linestyle='--', alpha=0.5)
+    axs[0].grid(True, color='#444444', linestyle='--', alpha=0.7)
     axs[0].set_facecolor('#121212')
+    for spine in axs[0].spines.values():
+        spine.set_edgecolor('#444444')
 
     # Average Monthly Return Seasonality
     sns.lineplot(x=monthly_avg_by_month.index - 1, y=monthly_avg_by_month.values,
@@ -67,24 +62,20 @@ if uploaded_files:
     axs[1].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], color='white')
     axs[1].tick_params(axis='y', colors='white')
-    axs[1].grid(True, color='gray', linestyle='--', alpha=0.5)
+    axs[1].grid(True, color='#444444', linestyle='--', alpha=0.7)
     axs[1].set_facecolor('#121212')
+    for spine in axs[1].spines.values():
+        spine.set_edgecolor('#444444')
 
-    # ----- NEW: Seasonality Heatmap: Year-wise Monthly Returns ----
-
-    # Calculate monthly returns by year-month
+    # Seasonality Heatmap: Year-wise Monthly Returns
     df['Year'] = df.index.year
     df['Month'] = df.index.month
-
     monthly_returns = df.groupby(['Year', 'Month'])['Daily Return %'].mean().unstack()
-
-    # Order months correctly (1-12)
     monthly_returns = monthly_returns.reindex(columns=range(1,13))
 
-    # Plot heatmap
     sns.heatmap(monthly_returns, cmap='RdYlGn', center=0, annot=True, fmt=".2f",
                 cbar_kws={'label': 'Average Monthly Return (%)'},
-                linewidths=0.5, linecolor='gray', ax=axs[2])
+                linewidths=0.3, linecolor='#333333', ax=axs[2])
 
     axs[2].set_title(f'{selected_stock} - Year-wise Monthly Return Heatmap', color='white')
     axs[2].set_xlabel('Month', color='white')
@@ -93,6 +84,8 @@ if uploaded_files:
                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], rotation=45, ha='right', color='white')
     axs[2].tick_params(axis='y', colors='white')
     axs[2].tick_params(axis='x', colors='white')
+    for spine in axs[2].spines.values():
+        spine.set_edgecolor('#333333')
     axs[2].set_facecolor('#121212')
 
     plt.tight_layout()
@@ -113,7 +106,7 @@ if uploaded_files:
 else:
     st.info("Please upload one or more CSV files with Date and Price columns.")
 
-# Set dark theme background for app
+# Dark theme background for Streamlit app
 page_bg = """
 <style>
     .reportview-container {
