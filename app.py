@@ -3,10 +3,10 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Set page config and title
+# Set Streamlit page config
 st.set_page_config(page_title="psxSeasonx", layout="wide")
 
-# Inject custom CSS for black & blue theme
+# Custom CSS for black & blue theme
 st.markdown(
     """
     <style>
@@ -44,17 +44,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Title and sidebar
+# App title
 st.title("📊 psxSeasonx")
 
+# Sidebar with instructions and sample CSV link
 with st.sidebar:
     st.header("How to Use psxSeasonx")
     st.markdown(
         """
-        1. Upload a CSV file with `Date` and `Price` columns.
-        2. Date format: MM/DD/YYYY (e.g. 05/17/2025).
-        3. See price trends and monthly return seasonality.
-        4. Download sample CSV below if you want to test.
+        1. Upload a CSV file with columns `Date` and `Price`.  
+        2. Date format should be MM/DD/YYYY (e.g., 05/17/2025).  
+        3. View closing price trends and average monthly return seasonality.  
+        4. Download sample CSV below to test the app.
         """
     )
     st.markdown(
@@ -66,26 +67,52 @@ uploaded_file = st.file_uploader("Upload your CSV file here:", type=["csv"])
 
 if uploaded_file:
     try:
+        # Load and process data
         df = pd.read_csv(uploaded_file)
         df['Date'] = pd.to_datetime(df['Date'], dayfirst=False)
         df = df.sort_values('Date')
         df.set_index('Date', inplace=True)
         df['Price'] = df['Price'].astype(float)
         df['Daily Return %'] = df['Price'].pct_change() * 100
+
+        # Calculate monthly average returns
         monthly_avg = df['Daily Return %'].resample('ME').mean()
         monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
 
-        st.subheader("📈 Closing Price Over Time")
-        st.line_chart(df['Price'])
+        # Plot using matplotlib + seaborn
+        fig, axs = plt.subplots(2, 1, figsize=(12, 10), constrained_layout=True)
 
-        st.subheader("📉 Average Monthly Return (%) - Seasonality")
-        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        monthly_df = pd.DataFrame({
-            'Month': months,
-            'Average Return %': monthly_avg_by_month.values
-        }).set_index('Month')
-        st.line_chart(monthly_df)
+        # Closing price over time
+        axs[0].plot(df.index, df['Price'], color='#61dafb', label='Closing Price')
+        axs[0].set_title('Closing Price Over Time', color='#61dafb')
+        axs[0].set_xlabel('Date', color='#a0c4ff')
+        axs[0].set_ylabel('Price', color='#a0c4ff')
+        axs[0].legend(facecolor='#1b263b', edgecolor='#61dafb')
+        axs[0].grid(True, color='#3a5068')
+
+        # Average monthly return seasonality
+        sns.lineplot(
+            x=monthly_avg_by_month.index - 1, 
+            y=monthly_avg_by_month.values, 
+            marker='o', 
+            color='#61dafb', 
+            ax=axs[1]
+        )
+        axs[1].set_title('Average Monthly Return (%) - Seasonality', color='#61dafb')
+        axs[1].set_xlabel('Month', color='#a0c4ff')
+        axs[1].set_ylabel('Average Return %', color='#a0c4ff')
+        axs[1].set_xticks(range(0, 12))
+        axs[1].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], color='#a0c4ff')
+        axs[1].grid(True, color='#3a5068')
+
+        # Style axis tick labels color
+        for ax in axs:
+            ax.tick_params(axis='x', colors='#a0c4ff')
+            ax.tick_params(axis='y', colors='#a0c4ff')
+            ax.set_facecolor('#0b1117')
+
+        # Show plots in Streamlit
+        st.pyplot(fig)
 
     except Exception as e:
         st.error(f"Error processing your file: {e}")
