@@ -1,12 +1,9 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
 import calendar
 import io
 from fpdf import FPDF
-plt.style.use('dark_background')
-
 
 st.set_page_config(page_title="PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -18,7 +15,7 @@ def set_dark_theme():
             background-color: #0e1117;
             color: #fafafa;
         }
-        .stPlotlyChart, .stButton, .stSelectbox, .stSlider, .stFileUploader {
+        .stButton, .stSelectbox, .stSlider, .stFileUploader {
             background-color: #1e222b;
             color: #fafafa;
         }
@@ -50,38 +47,53 @@ def calculate_seasonality(df):
     return monthly_avg_by_month
 
 def plot_price_chart(df, stock_name):
-    fig, ax = plt.subplots(figsize=(12, 4))
-    ax.plot(df.index, df['Price'], color='cyan', label='Closing Price')
-    ax.set_title(f'{stock_name} - Closing Price Over Time')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Price')
-    ax.grid(True,color='gray', alpha=0.15)
-    ax.legend()
-    st.pyplot(fig)
+    df_reset = df.reset_index()
+    fig = px.line(df_reset, x='Date', y='Price', title=f'{stock_name} - Closing Price Over Time',
+                  labels={'Price': 'Price', 'Date': 'Date'},
+                  template='plotly_dark',
+                  color_discrete_sequence=['#00FFFF'])  # Cyan color
+    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
+                      font_color='white')
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(gridcolor='rgba(255,255,255,0.15)')  # 15% opacity grid lines
+    st.plotly_chart(fig, use_container_width=True)
 
 def plot_seasonality_chart(monthly_avg_by_month, stock_name):
-    fig, ax = plt.subplots(figsize=(12, 4))
-    sns.lineplot(x=monthly_avg_by_month.index - 1, y=monthly_avg_by_month.values, marker='o', ax=ax, color='lime')
-    ax.set_title(f'{stock_name} - Avg Monthly Return (%)')
-    ax.set_xlabel('Month')
-    ax.set_ylabel('Avg Return %')
-    ax.set_xticks(range(0, 12))
-    ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
-    ax.grid(True,color='gray', alpha=0.15)
-    st.pyplot(fig)
+    # Prepare DataFrame for Plotly
+    df_season = monthly_avg_by_month.rename_axis('Month').reset_index()
+    df_season['Month Name'] = df_season['Month'].apply(lambda x: calendar.month_abbr[x])
+
+    fig = px.line(df_season, x='Month Name', y='Daily Return %',
+                  title=f'{stock_name} - Average Monthly Return (%)',
+                  labels={'Daily Return %': 'Avg Return %', 'Month Name': 'Month'},
+                  markers=True,
+                  template='plotly_dark',
+                  color_discrete_sequence=['#32CD32'])  # Lime green
+    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
+                      font_color='white')
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(gridcolor='rgba(255,255,255,0.15)')
+    st.plotly_chart(fig, use_container_width=True)
 
 def plot_seasonality_heatmap(df, stock_name):
     df['Year'] = df.index.year
     df['Month'] = df.index.month
     pivot = df.pivot_table(values='Daily Return %', index='Year', columns='Month', aggfunc='mean')
-    fig, ax = plt.subplots(figsize=(12, 5))
-    sns.heatmap(pivot, cmap='coolwarm', annot=True, fmt=".1f", ax=ax, cbar=True)
-    ax.set_title(f"{stock_name} - Year-wise Monthly Return Heatmap (%)")
-    ax.set_xlabel('Month')
-    ax.set_ylabel('Year')
-    ax.set_xticklabels([calendar.month_abbr[i] for i in range(1, 13)])
-    st.pyplot(fig)
+
+    # Prepare data for heatmap
+    pivot = pivot[range(1, 13)]  # Ensure columns in order Jan-Dec
+    pivot.columns = [calendar.month_abbr[m] for m in pivot.columns]
+
+    fig = px.imshow(pivot,
+                    color_continuous_scale='RdBu_r',
+                    title=f"{stock_name} - Year-wise Monthly Return Heatmap (%)",
+                    labels=dict(x="Month", y="Year", color="Return %"),
+                    aspect="auto",
+                    template='plotly_dark')
+
+    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
+                      font_color='white')
+    st.plotly_chart(fig, use_container_width=True)
 
 def to_excel(df):
     output = io.BytesIO()
