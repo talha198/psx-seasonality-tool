@@ -5,6 +5,8 @@ import seaborn as sns
 import calendar
 import io
 from fpdf import FPDF
+plt.style.use('dark_background')
+
 
 st.set_page_config(page_title="PSX SEASONX", layout="wide", page_icon="📈")
 
