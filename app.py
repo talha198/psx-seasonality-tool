@@ -1,28 +1,72 @@
 import pandas as pd
+import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
-import streamlit as st
 
-st.set_page_config(page_title="PSX Seasonality Tool", layout="wide")
+# Set page config and title
+st.set_page_config(page_title="psxSeasonx", layout="wide")
 
-# App title
-st.title("📈 PSX Seasonality Tool")
-st.write("Upload a CSV file with `Date` and `Price` columns to visualize PSX monthly return seasonality.")
-st.markdown("""
-- `Date` should be in MM/DD/YYYY or similar format.
-- `Price` should be numerical (e.g. closing prices).
-- If you want to try it out, use this [sample file](https://raw.githubusercontent.com/yourusername/psx-seasonality-tool/main/test.csv)
-""")
+# Inject custom CSS for black & blue theme
+st.markdown(
+    """
+    <style>
+    body, .stApp {
+        background-color: #0b1117;
+        color: #61dafb;
+    }
+    .css-18e3th9 {
+        background-color: #0b1117;
+    }
+    .stButton>button {
+        background-color: #1b263b;
+        color: #61dafb;
+        border-radius: 8px;
+        border: none;
+        padding: 8px 16px;
+        font-weight: 600;
+        transition: background-color 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #3a5068;
+        color: white;
+    }
+    .css-1d391kg {
+        background-color: #0b1117;
+    }
+    h1, h2, h3, .css-1v3fvcr {
+        color: #61dafb;
+    }
+    .stMarkdown p, .stMarkdown li {
+        color: #a0c4ff;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Title and sidebar
+st.title("📊 psxSeasonx")
+
+with st.sidebar:
+    st.header("How to Use psxSeasonx")
+    st.markdown(
+        """
+        1. Upload a CSV file with `Date` and `Price` columns.
+        2. Date format: MM/DD/YYYY (e.g. 05/17/2025).
+        3. See price trends and monthly return seasonality.
+        4. Download sample CSV below if you want to test.
+        """
+    )
+    st.markdown(
+        "[📥 Download Sample CSV](https://raw.githubusercontent.com/yourusername/psx-seasonality-tool/main/test.csv)"
+    )
 
 # File uploader
-uploaded_file = st.file_uploader("📤 Upload your CSV file", type=["csv"])
+uploaded_file = st.file_uploader("Upload your CSV file here:", type=["csv"])
 
-if uploaded_file is not None:
+if uploaded_file:
     try:
-        # Load CSV
         df = pd.read_csv(uploaded_file)
-
-        # Preprocess
         df['Date'] = pd.to_datetime(df['Date'], dayfirst=False)
         df = df.sort_values('Date')
         df.set_index('Date', inplace=True)
@@ -31,30 +75,20 @@ if uploaded_file is not None:
         monthly_avg = df['Daily Return %'].resample('ME').mean()
         monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
 
-        # Plotting
-        fig, axs = plt.subplots(2, 1, figsize=(12, 10))
+        st.subheader("📈 Closing Price Over Time")
+        st.line_chart(df['Price'])
 
-        axs[0].plot(df.index, df['Price'], color='blue', label='Closing Price')
-        axs[0].set_title('Closing Price Over Time')
-        axs[0].set_xlabel('Date')
-        axs[0].set_ylabel('Price')
-        axs[0].legend()
-        axs[0].grid(True)
-
-        sns.lineplot(x=monthly_avg_by_month.index - 1,
-                     y=monthly_avg_by_month.values,
-                     marker='o', ax=axs[1])
-        axs[1].set_title('Average Monthly Return (%) - Seasonality')
-        axs[1].set_xlabel('Month')
-        axs[1].set_ylabel('Average Return %')
-        axs[1].set_xticks(range(0,12))
-        axs[1].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
-        axs[1].grid(True)
-
-        st.pyplot(fig)
+        st.subheader("📉 Average Monthly Return (%) - Seasonality")
+        months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        monthly_df = pd.DataFrame({
+            'Month': months,
+            'Average Return %': monthly_avg_by_month.values
+        }).set_index('Month')
+        st.line_chart(monthly_df)
 
     except Exception as e:
-        st.error(f"Error processing file: {e}")
+        st.error(f"Error processing your file: {e}")
+
 else:
-    st.info("👆 Please upload a CSV file to begin.")
+    st.info("👆 Upload a CSV file to start analyzing PSX seasonality.")
