@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import io
 
 st.set_page_config(page_title="PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -40,6 +39,9 @@ if uploaded_files:
 
     fig, axs = plt.subplots(3, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [2, 2, 3]})
 
+    # Set overall figure background color
+    fig.patch.set_facecolor('#121212')
+
     # Closing Price Over Time
     axs[0].plot(df.index, df['Price'], color='#00aaff')
     axs[0].set_title(f'{selected_stock} - Closing Price Over Time', color='white')
@@ -50,7 +52,7 @@ if uploaded_files:
     axs[0].grid(True, color='#444444', linestyle='--', alpha=0.7)
     axs[0].set_facecolor('#121212')
     for spine in axs[0].spines.values():
-        spine.set_color('#121212')  # hides spines
+        spine.set_visible(False)  # hide all spines
 
     # Average Monthly Return Seasonality
     sns.lineplot(x=monthly_avg_by_month.index - 1, y=monthly_avg_by_month.values,
@@ -65,7 +67,7 @@ if uploaded_files:
     axs[1].grid(True, color='#444444', linestyle='--', alpha=0.7)
     axs[1].set_facecolor('#121212')
     for spine in axs[1].spines.values():
-        spine.set_color('#121212')  # hides spines
+        spine.set_visible(False)  # hide all spines
 
     # Seasonality Heatmap: Year-wise Monthly Returns
     df['Year'] = df.index.year
@@ -76,7 +78,7 @@ if uploaded_files:
     sns.heatmap(
         monthly_returns, cmap='RdYlGn', center=0, annot=True, fmt=".2f",
         cbar_kws={'label': 'Average Monthly Return (%)'},
-        linewidths=0.5, linecolor='#121212',  # same as background to hide white borders
+        linewidths=0, linecolor='none',  # No lines between cells
         ax=axs[2]
     )
     axs[2].set_title(f'{selected_stock} - Year-wise Monthly Return Heatmap', color='white')
@@ -88,7 +90,7 @@ if uploaded_files:
     axs[2].tick_params(axis='x', colors='white')
 
     for spine in axs[2].spines.values():
-        spine.set_visible(False)  # hides heatmap spines
+        spine.set_visible(False)  # hide all spines
 
     axs[2].set_facecolor('#121212')
 
@@ -113,12 +115,17 @@ else:
 # Dark theme background for Streamlit app
 page_bg = """
 <style>
-    .reportview-container {
+    .reportview-container, .main, .block-container {
         background-color: #0e1117;
         color: white;
     }
     .sidebar .sidebar-content {
         background-color: #121212;
+        color: white;
+    }
+    /* Hide white borders in other areas */
+    .css-18e3th9 {
+        background-color: #0e1117;
     }
 </style>
 """
