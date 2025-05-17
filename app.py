@@ -2,131 +2,134 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import calendar
+import io
+from fpdf import FPDF
 
 st.set_page_config(page_title="PSX SEASONX", layout="wide", page_icon="📈")
 
-# --- APP TITLE & HEADER ---
-st.markdown("""
-    <h1 style='color:#00aaff; text-align:center; font-family:Arial Black, sans-serif;'>PSX SEASONX</h1>
-    <h3 style='color:#3399ff; text-align:center; font-family:Arial, sans-serif;'>Pakistan Stock Exchange Seasonality Intelligence Tool</h3>
-    <hr style="border:1px solid #00aaff;">
-    """, unsafe_allow_html=True)
+# ------------------ UI Style ------------------
+def set_dark_theme():
+    st.markdown("""
+        <style>
+        body, .main, .block-container {
+            background-color: #0e1117;
+            color: #fafafa;
+        }
+        .stPlotlyChart, .stButton, .stSelectbox, .stSlider, .stFileUploader {
+            background-color: #1e222b;
+            color: #fafafa;
+        }
+        h1, h2, h3 {
+            color: #29b6f6;
+        }
+        .css-1aumxhk {
+            padding: 2rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-# --- UPLOAD FILES ---
-uploaded_files = st.file_uploader(
-    "Upload one or more PSX CSV files (Date, Price columns expected)", 
-    type=['csv'], accept_multiple_files=True)
+set_dark_theme()
 
-if uploaded_files:
-    stock_dfs = {}
-    for file in uploaded_files:
-        df = pd.read_csv(file)
-        df['Date'] = pd.to_datetime(df['Date'], dayfirst=False)
-        df = df.sort_values('Date')
-        df.set_index('Date', inplace=True)
-        df['Price'] = df['Price'].astype(float)
-        stock_name = file.name.replace('.csv','')
-        stock_dfs[stock_name] = df
-
-    selected_stock = st.selectbox("Select Stock to Analyze", options=list(stock_dfs.keys()))
-
-    df = stock_dfs[selected_stock]
-
+# ------------------ Functions ------------------
+@st.cache_data
+def load_data(uploaded_file):
+    df = pd.read_csv(uploaded_file)
+    df['Date'] = pd.to_datetime(df['Date'], dayfirst=False)
+    df = df.sort_values('Date')
+    df.set_index('Date', inplace=True)
+    df['Price'] = df['Price'].astype(float)
     df['Daily Return %'] = df['Price'].pct_change() * 100
+    return df
 
+def calculate_seasonality(df):
     monthly_avg = df['Daily Return %'].resample('ME').mean()
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
+    return monthly_avg_by_month
 
-    fig, axs = plt.subplots(3, 1, figsize=(14, 16), gridspec_kw={'height_ratios': [2, 2, 3]})
-
-    # Set overall figure background color
-    fig.patch.set_facecolor('#121212')
-
-    # Closing Price Over Time
-    axs[0].plot(df.index, df['Price'], color='#00aaff')
-    axs[0].set_title(f'{selected_stock} - Closing Price Over Time', color='white')
-    axs[0].set_xlabel('Date', color='white')
-    axs[0].set_ylabel('Price', color='white')
-    axs[0].tick_params(axis='x', colors='white')
-    axs[0].tick_params(axis='y', colors='white')
-    axs[0].grid(True, color='#444444', linestyle='--', alpha=0.7)
-    axs[0].set_facecolor('#121212')
-    for spine in axs[0].spines.values():
-        spine.set_visible(False)  # hide all spines
-
-    # Average Monthly Return Seasonality
-    sns.lineplot(x=monthly_avg_by_month.index - 1, y=monthly_avg_by_month.values,
-                 marker='o', color='#3399ff', ax=axs[1])
-    axs[1].set_title(f'{selected_stock} - Average Monthly Return (%) - Seasonality', color='white')
-    axs[1].set_xlabel('Month', color='white')
-    axs[1].set_ylabel('Average Return %', color='white')
-    axs[1].set_xticks(range(0, 12))
-    axs[1].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], color='white')
-    axs[1].tick_params(axis='y', colors='white')
-    axs[1].grid(True, color='#444444', linestyle='--', alpha=0.7)
-    axs[1].set_facecolor('#121212')
-    for spine in axs[1].spines.values():
-        spine.set_visible(False)  # hide all spines
-
-    # Seasonality Heatmap: Year-wise Monthly Returns
-    df['Year'] = df.index.year
-    df['Month'] = df.index.month
-    monthly_returns = df.groupby(['Year', 'Month'])['Daily Return %'].mean().unstack()
-    monthly_returns = monthly_returns.reindex(columns=range(1,13))
-
-    sns.heatmap(
-        monthly_returns, cmap='RdYlGn', center=0, annot=True, fmt=".2f",
-        cbar_kws={'label': 'Average Monthly Return (%)'},
-        linewidths=0, linecolor='none',  # No lines between cells
-        ax=axs[2]
-    )
-    axs[2].set_title(f'{selected_stock} - Year-wise Monthly Return Heatmap', color='white')
-    axs[2].set_xlabel('Month', color='white')
-    axs[2].set_ylabel('Year', color='white')
-    axs[2].set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], rotation=45, ha='right', color='white')
-    axs[2].tick_params(axis='y', colors='white')
-    axs[2].tick_params(axis='x', colors='white')
-
-    for spine in axs[2].spines.values():
-        spine.set_visible(False)  # hide all spines
-
-    axs[2].set_facecolor('#121212')
-
-    plt.tight_layout()
+def plot_price_chart(df, stock_name):
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.plot(df.index, df['Price'], color='cyan', label='Closing Price')
+    ax.set_title(f'{stock_name} - Closing Price Over Time')
+    ax.set_xlabel('Date')
+    ax.set_ylabel('Price')
+    ax.grid(True)
+    ax.legend()
     st.pyplot(fig)
 
-    st.markdown("---")
-    st.markdown(
-        "<h3 style='color:#00aaff;'>Upcoming Features</h3>", unsafe_allow_html=True)
-    st.write("""
-    - Portfolio-Level Seasonality Aggregation  
-    - Risk-Adjusted Seasonality Metrics  
-    - Economic Event Overlay  
-    - Seasonality Alerts and Notifications  
-    - Custom Date Range Analysis  
-    - Interactive Charts  
+def plot_seasonality_chart(monthly_avg_by_month, stock_name):
+    fig, ax = plt.subplots(figsize=(12, 4))
+    sns.lineplot(x=monthly_avg_by_month.index - 1, y=monthly_avg_by_month.values, marker='o', ax=ax, color='lime')
+    ax.set_title(f'{stock_name} - Avg Monthly Return (%)')
+    ax.set_xlabel('Month')
+    ax.set_ylabel('Avg Return %')
+    ax.set_xticks(range(0, 12))
+    ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+    ax.grid(True)
+    st.pyplot(fig)
+
+def plot_seasonality_heatmap(df, stock_name):
+    df['Year'] = df.index.year
+    df['Month'] = df.index.month
+    pivot = df.pivot_table(values='Daily Return %', index='Year', columns='Month', aggfunc='mean')
+    fig, ax = plt.subplots(figsize=(12, 5))
+    sns.heatmap(pivot, cmap='coolwarm', annot=True, fmt=".1f", ax=ax, cbar=True)
+    ax.set_title(f"{stock_name} - Year-wise Monthly Return Heatmap (%)")
+    ax.set_xlabel('Month')
+    ax.set_ylabel('Year')
+    ax.set_xticklabels([calendar.month_abbr[i] for i in range(1, 13)])
+    st.pyplot(fig)
+
+def to_excel(df):
+    output = io.BytesIO()
+    writer = pd.ExcelWriter(output, engine='openpyxl')
+    df.to_excel(writer, index=False, sheet_name='Seasonality Report')
+    writer.close()
+    return output.getvalue()
+
+# ------------------ App UI ------------------
+
+st.title("📊 PSX SEASONX - Pakistan Stock Seasonality Intelligence Tool")
+
+uploaded_file = st.file_uploader("Upload a CSV file (Date, Price)", type=["csv"])
+
+if uploaded_file:
+    stock_name = st.text_input("Enter Stock Name", value="PSX Stock")
+
+    df = load_data(uploaded_file)
+    monthly_avg_by_month = calculate_seasonality(df)
+
+    tab1, tab2, tab3 = st.tabs(["📈 Charts", "🌡️ Heatmap", "📤 Export Report"])
+
+    with tab1:
+        plot_price_chart(df, stock_name)
+        plot_seasonality_chart(monthly_avg_by_month, stock_name)
+
+    with tab2:
+        plot_seasonality_heatmap(df, stock_name)
+
+    with tab3:
+        st.subheader("📥 Download Seasonality Report")
+
+        # Prepare Excel for download
+        excel_data = to_excel(monthly_avg_by_month.rename_axis('Month').reset_index())
+        st.download_button(
+            label="📊 Download Excel",
+            data=excel_data,
+            file_name=f"{stock_name}_seasonality.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+# ------------------ Upcoming Features ------------------
+with st.expander("🚀 Upcoming Features"):
+    st.markdown("""
+    - 📍 Interactive tooltips and animations  
+    - 📊 Multi-stock dynamic comparison  
+    - 🔔 Buy/Sell signal generator  
+    - 📅 Date range filters  
+    - 🧠 Machine-learning-based pattern detection  
+    - 📈 Seasonality correlation clusters  
+    - 🧪 Backtesting tool for seasonal strategies  
+    - 🔗 API integrations and PSX screener  
     """)
-
-else:
-    st.info("Please upload one or more CSV files with Date and Price columns.")
-
-# Dark theme background for Streamlit app
-page_bg = """
-<style>
-    .reportview-container, .main, .block-container {
-        background-color: #0e1117;
-        color: white;
-    }
-    .sidebar .sidebar-content {
-        background-color: #121212;
-        color: white;
-    }
-    /* Hide white borders in other areas */
-    .css-18e3th9 {
-        background-color: #0e1117;
-    }
-</style>
-"""
-st.markdown(page_bg, unsafe_allow_html=True)
