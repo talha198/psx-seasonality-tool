@@ -23,9 +23,8 @@ uploaded_files = st.file_uploader(
 
 def to_excel(df):
     output = BytesIO()
-    writer = pd.ExcelWriter(output, engine='xlsxwriter')
-    df.to_excel(writer, sheet_name='Seasonality')
-    writer.save()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, sheet_name='Seasonality')
     processed_data = output.getvalue()
     return processed_data
 
