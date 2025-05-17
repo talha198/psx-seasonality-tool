@@ -68,7 +68,7 @@ def plot_seasonality_chart(monthly_avg_by_month, stock_name):
     ax.set_xticks(range(0, 12))
     ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
-    ax.grid(True)
+    ax.grid(True,color='gray', alpha=0.15)
     st.pyplot(fig)
 
 def plot_seasonality_heatmap(df, stock_name):
