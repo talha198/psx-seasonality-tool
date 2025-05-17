@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from io import BytesIO
+from fpdf import FPDF
 
 # Set page config
 st.set_page_config(page_title="PSX SEASONX", page_icon="📈", layout="wide")
@@ -13,12 +15,45 @@ st.markdown("""
 Upload multiple PSX stock CSV files and compare their monthly average return seasonality.
 """)
 
-# File uploader allowing multiple CSVs
 uploaded_files = st.file_uploader(
     "Upload CSV files for different PSX stocks (each must have 'Date' and 'Price' columns):", 
     type=['csv'], 
     accept_multiple_files=True
 )
+
+def to_excel(df):
+    output = BytesIO()
+    writer = pd.ExcelWriter(output, engine='xlsxwriter')
+    df.to_excel(writer, sheet_name='Seasonality')
+    writer.save()
+    processed_data = output.getvalue()
+    return processed_data
+
+def to_pdf(stock_name, monthly_avg_by_month):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.set_text_color(0, 0, 139)  # dark blue
+
+    pdf.cell(0, 10, f"PSX SEASONX - Seasonality Report for {stock_name}", ln=True, align='C')
+
+    pdf.ln(10)
+    pdf.set_font("Arial", size=10)
+    pdf.cell(40, 10, "Month", border=1, align='C')
+    pdf.cell(60, 10, "Average Return (%)", border=1, align='C')
+    pdf.ln()
+
+    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    for month_idx in range(1, 13):
+        avg_return = monthly_avg_by_month.get(month_idx, 0)
+        pdf.cell(40, 10, month_names[month_idx-1], border=1, align='C')
+        pdf.cell(60, 10, f"{avg_return:.2f}", border=1, align='C')
+        pdf.ln()
+
+    pdf_output = pdf.output(dest='S').encode('latin1')
+    return pdf_output
 
 if uploaded_files:
     stock_data = {}
@@ -33,12 +68,11 @@ if uploaded_files:
         monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
         stock_data[file.name] = monthly_avg_by_month
 
-    # Stock selector dropdown
     stock_selected = st.selectbox("Select stock to view seasonality:", list(stock_data.keys()))
 
-    # Plot seasonality for selected stock
     monthly_avg_by_month = stock_data[stock_selected]
 
+    # Plot seasonality for selected stock
     fig, ax = plt.subplots(figsize=(10,5))
     sns.lineplot(
         x=monthly_avg_by_month.index - 1, 
@@ -64,15 +98,34 @@ if uploaded_files:
 
     st.pyplot(fig)
 
+    # Export buttons
+    col1, col2 = st.columns(2)
+
+    with col1:
+        excel_data = to_excel(monthly_avg_by_month.rename_axis('Month').reset_index())
+        st.download_button(
+            label="📥 Download Seasonality as Excel",
+            data=excel_data,
+            file_name=f"{stock_selected}_seasonality.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    with col2:
+        pdf_data = to_pdf(stock_selected, monthly_avg_by_month)
+        st.download_button(
+            label="📥 Download Seasonality as PDF",
+            data=pdf_data,
+            file_name=f"{stock_selected}_seasonality.pdf",
+            mime="application/pdf"
+        )
+
 else:
     st.info("Upload one or more CSV files to start analyzing seasonality.")
 
-# Footer or upcoming features header
 st.markdown("---")
 st.subheader("Upcoming Features")
 st.markdown("""
 - Multi-stock side-by-side comparison charts  
-- Export seasonality reports (PDF/Excel)  
 - Interactive charts with tooltips and zoom  
 - Portfolio watchlist with aggregate seasonality view  
 - Risk-adjusted seasonality metrics  
