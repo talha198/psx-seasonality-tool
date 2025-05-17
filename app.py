@@ -55,7 +55,7 @@ def plot_price_chart(df, stock_name):
     ax.set_title(f'{stock_name} - Closing Price Over Time')
     ax.set_xlabel('Date')
     ax.set_ylabel('Price')
-    ax.grid(True)
+    ax.grid(True,color='gray', alpha=0.15)
     ax.legend()
     st.pyplot(fig)
 
