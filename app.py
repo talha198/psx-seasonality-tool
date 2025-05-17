@@ -4,15 +4,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Set Streamlit page config
-st.set_page_config(page_title="psxSeasonx", layout="wide")
+st.set_page_config(page_title="PSX SEASONX", layout="wide")
 
-# Custom CSS for black & blue theme
+# Custom CSS for black & blue theme + styling
 st.markdown(
     """
     <style>
     body, .stApp {
         background-color: #0b1117;
         color: #61dafb;
+        font-family: 'Inter', sans-serif;
     }
     .css-18e3th9 {
         background-color: #0b1117;
@@ -39,17 +40,35 @@ st.markdown(
     .stMarkdown p, .stMarkdown li {
         color: #a0c4ff;
     }
+    hr {
+        border: 1px solid #1b263b;
+        margin: 1.5rem 0;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# App title
-st.title("📊 psxSeasonx")
+# Title and tagline
+st.title("📊 PSX SEASONX")
+st.markdown("*Your Data-Driven Seasonality Intelligence for the Pakistan Stock Market*")
+
+# Upcoming features section
+st.markdown("---")
+st.subheader("🚀 Upcoming Features & Enhancements")
+st.markdown("""
+- 📈 **Multi-Stock Analysis:** Compare seasonality across multiple PSX stocks simultaneously.  
+- 🕒 **Custom Date Range Selection:** Analyze seasonality for specific periods or years.  
+- 📊 **Interactive Charts:** Switch between line, bar, and heatmap visualizations with tooltips.  
+- 📥 **Export & Share:** Download data and charts, or share interactive reports with your team.  
+- 🔔 **Seasonality Alerts:** Get notified of optimal buy/sell windows based on historical data.  
+- 📰 **Market News Integration:** Correlate seasonality trends with real-time Pakistan Stock Market news.  
+- 🤖 **AI-Driven Insights:** Receive data-backed recommendations for better decision-making.  
+""")
 
 # Sidebar with instructions and sample CSV link
 with st.sidebar:
-    st.header("How to Use psxSeasonx")
+    st.header("How to Use PSX SEASONX")
     st.markdown(
         """
         1. Upload a CSV file with columns `Date` and `Price`.  
