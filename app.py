@@ -61,17 +61,41 @@ def plot_price_chart_plotly(df, stock_name):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# Seasonality chart with crosshair and zoom
 def plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name):
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=months, y=monthly_avg_by_month.values, mode='lines+markers', line=dict(color='lime'), name='Avg Monthly Return %'))
+    fig.add_trace(go.Scatter(
+        x=months,
+        y=monthly_avg_by_month.values,
+        mode='lines+markers',
+        line=dict(color='lime', width=2),
+        marker=dict(size=8),
+        name='Avg Monthly Return %'
+    ))
     fig.update_layout(
         title=f'{stock_name} - Avg Monthly Return (%)',
         xaxis_title='Month',
         yaxis_title='Avg Return %',
         template='plotly_dark',
         hovermode='x unified',
+        xaxis=dict(
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.15)',  # subtle grid lines
+            tickmode='array',
+            tickvals=months,
+            ticktext=months
+        ),
+        yaxis=dict(
+            showgrid=True,
+            gridcolor='rgba(255,255,255,0.15)'
+        ),
+        font=dict(
+            family="Arial, sans-serif",
+            size=12,
+            color="white"
+        ),
+        plot_bgcolor='#0e1117',
+        paper_bgcolor='#0e1117',
     )
     st.plotly_chart(fig, use_container_width=True)
 
