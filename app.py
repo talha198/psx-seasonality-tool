@@ -9,7 +9,7 @@ import base64
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
-# --- CSS ---
+# --- CSS Styling ---
 st.markdown("""
 <style>
 body {
@@ -49,21 +49,14 @@ stock_ticker_input = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2015-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 
-st.sidebar.markdown("---")
-st.sidebar.write("⚙️ *Filters coming soon...*")
-
-if "show_test_data" not in st.session_state:
-    st.session_state.show_test_data = False
-
-if st.sidebar.button("Test API with Sample Ticker"):
-    st.session_state.show_test_data = True
+if start_date >= end_date:
+    st.sidebar.error("Start date must be before end date.")
+    st.stop()
 
 # --- Functions ---
 
 @st.cache_data(show_spinner=False)
 def fetch_stock_data(ticker, start, end):
-    if start >= end:
-        raise ValueError("Start date must be before end date.")
     df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
     if df.empty:
         raise ValueError(f"No data found for ticker '{ticker}' or date range.")
@@ -78,7 +71,7 @@ def fetch_stock_data(ticker, start, end):
 def calculate_seasonality(df):
     monthly_avg = df['Daily Return %'].groupby(df.index.month).mean()
     monthly_avg.index.name = 'Month'
-    monthly_avg.name = 'Daily Return %'
+    monthly_avg.name = 'Avg Monthly Return (%)'
     return monthly_avg
 
 def get_first_price_of_month(df):
@@ -95,7 +88,6 @@ def analyze_favorable_times(df, monthly_avg):
 
     first_prices = get_first_price_of_month(df)
     compound_profit = 100000
-    compound_return_pct = 0
 
     if not first_prices.empty and buy_months:
         for year in first_prices.index.year.unique():
@@ -105,7 +97,8 @@ def analyze_favorable_times(df, monthly_avg):
             for i in range(1, len(year_month_prices)):
                 ret = (year_month_prices.iloc[i] - year_month_prices.iloc[i-1]) / year_month_prices.iloc[i-1]
                 compound_profit *= (1 + ret)
-        compound_return_pct = ((compound_profit - 100000) / 100000) * 100
+
+    compound_return_pct = ((compound_profit - 100000) / 100000) * 100
 
     today_month = datetime.today().month
     upcoming_buy_months = [m for m in buy_months if m >= today_month]
@@ -171,7 +164,6 @@ def display_seasonality_for_ticker(ticker, start, end):
         st.subheader(f"📈 Seasonality Summary for {ticker.upper()}")
 
         col1, col2 = st.columns(2)
-
         with col1:
             st.markdown(f"**Favorable Buy Months:** {', '.join(results['buy_month_names']) if results['buy_month_names'] else 'None'}")
             st.markdown(f"**Favorable Sell Months:** {', '.join(results['sell_month_names']) if results['sell_month_names'] else 'None'}")
@@ -207,12 +199,10 @@ def display_seasonality_for_ticker(ticker, start, end):
             'Avg Monthly Return (%)': forecast_returns
         })
 
-        # Show forecast table
         st.table(forecast_df.style.applymap(
             lambda v: 'color: #32CD32;' if v >= 0 else 'color: #FF6347;', subset=['Avg Monthly Return (%)']
         ))
 
-        # Plot forecast chart
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=forecast_month_names,
@@ -231,10 +221,10 @@ def display_seasonality_for_ticker(ticker, start, end):
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        # Download link for seasonality data
         monthly_df = monthly_avg.rename_axis('Month').reset_index()
         monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
-        monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
-        monthly_df.rename(columns={'Daily Return %': 'Avg Monthly Return (%)'}, inplace=True)
+        monthly_df = monthly_df[['Month', 'Month_Name', 'Avg Monthly Return (%)']]
         download_link(monthly_df)
 
     except Exception as e:
@@ -242,8 +232,21 @@ def display_seasonality_for_ticker(ticker, start, end):
 
 # --- Main Execution ---
 
-if st.session_state.show_test_data:
-    display_seasonality_for_ticker("TRG.PK", pd.to_datetime("2015-01-01"), pd.to_datetime("today"))
+if stock_ticker_input:
+    display_seasonality_for_ticker(stock_ticker_input.strip(), start_date, end_date)
 else:
-    if stock_ticker_input:
-        display_seasonality_for_ticker(stock_ticker_input.strip(), start_date, end_date)
+    st.info("Please enter a valid stock ticker symbol in the sidebar to see seasonality analysis.")
+
+# Optional: Add a refresh button to clear cache and reload data
+if st.sidebar.button("🔄 Refresh Data Cache"):
+    st.cache_data.clear()
+    st.experimental_rerun()
+
+# Footer
+st.markdown("""
+<hr style="border:1px solid #333;">
+<div style="text-align:center; color:#888; font-size:12px; margin-top:20px;">
+    Developed with 💚 for Pakistani investors | Data via Yahoo Finance | © 2025 PSX SEASONX
+</div>
+""", unsafe_allow_html=True)
+
