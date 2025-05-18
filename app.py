@@ -5,33 +5,24 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 import yfinance as yf
-import base64
-from io import BytesIO
+import random
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
-# --- Your existing CSS here (paste your style block if you want) ---
+# --- CSS for styling (add your existing CSS here or adjust as needed) ---
 st.markdown("""
 <style>
-/* Add your existing CSS styles here */
-body {
-    background-color: #0e1117;
-    color: #fafafa;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-.title-container h1 {
-    font-weight: 700;
-    font-size: 3rem;
-    color: lime;
-    text-shadow: 0 0 5px lime;
+.title-container {
+    text-align: center;
+    margin-bottom: 1rem;
 }
 .return-positive {
-    color: #32CD32;
-    font-weight: 600;
+    color: green;
+    font-weight: bold;
 }
 .return-negative {
-    color: #FF6347;
-    font-weight: 600;
+    color: red;
+    font-weight: bold;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -46,7 +37,28 @@ st.markdown("""
 
 # ------------------ Sidebar ------------------
 st.sidebar.title("🔧 Settings & Filters")
-stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")  # example PSX ticker with .PK suffix
+
+# Your watchlist for ticker suggestions
+watchlist = [
+    "TRG.PK", "HBL.PK", "OGDC.PK", "UBL.PK", "MARI.PK", "SNGP.PK", "PSO.PK", "KEL.PK", "FSL.PK"
+]
+
+# Text input for ticker
+stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")
+
+# Show random suggestion if user typed at least 1 char
+if len(stock_ticker.strip()) >= 1:
+    suggestion = random.choice(watchlist)
+    st.sidebar.markdown(f"**Suggestion:** {suggestion}")
+    if st.sidebar.button(f"Use Suggested Ticker: {suggestion}"):
+        # When user clicks button, update stock_ticker via session state and rerun
+        st.session_state['stock_ticker'] = suggestion
+        st.experimental_rerun()
+
+# Keep stock_ticker from session state if available (for button click to persist)
+if 'stock_ticker' in st.session_state:
+    stock_ticker = st.session_state['stock_ticker']
+
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2015-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 st.sidebar.markdown("---")
@@ -66,50 +78,32 @@ def fetch_stock_data(ticker, start, end):
     return df
 
 def calculate_seasonality(df):
-    # Calculate average daily returns by month over all years
-    monthly_avg = df['Daily Return %'].groupby(df.index.month).mean()
-    monthly_avg.index.name = 'Month'
-    monthly_avg.name = 'Daily Return %'
+    # Calculate average monthly returns
+    df['Month'] = df.index.month
+    monthly_avg = df.groupby('Month')['Daily Return %'].mean()
     return monthly_avg
 
-def get_first_price_of_month(df):
-    # Get first price of each month for compound return calc
-    first_prices = df['Price'].resample('MS').first()
-    return first_prices
-
 def analyze_favorable_times(df, monthly_avg):
-    # Determine favorable months based on average return > 0 (buy), < 0 (sell)
     buy_months = monthly_avg[monthly_avg > 0].index.tolist()
     sell_months = monthly_avg[monthly_avg <= 0].index.tolist()
 
-    # Get month names
     buy_month_names = [calendar.month_name[m] for m in buy_months]
     sell_month_names = [calendar.month_name[m] for m in sell_months]
 
-    # Calculate simple return = sum of avg returns of buy months (assumes buying and selling monthly)
-    simple_return_pct = monthly_avg.loc[buy_months].sum() if buy_months else 0
+    # Simple return: sum of monthly returns of buy months
+    simple_return_pct = monthly_avg[buy_months].sum()
     simple_profit = 100000 * simple_return_pct / 100
 
-    # Compound return calculation over entire period for buy months only
-    first_prices = get_first_price_of_month(df)
-    compound_profit = 100000
-    compound_return_pct = 0
-    if not first_prices.empty and buy_months:
-        # Compound by multiplying returns of buy months for each year
-        for year in first_prices.index.year.unique():
-            # Filter first prices of buy months in this year
-            year_month_prices = first_prices[first_prices.index.year == year].loc[
-                first_prices.index.month.isin(buy_months)
-            ]
-            # Calculate compounded return
-            for i in range(1, len(year_month_prices)):
-                ret = (year_month_prices.iloc[i] - year_month_prices.iloc[i-1]) / year_month_prices.iloc[i-1]
-                compound_profit *= (1 + ret)
-        compound_return_pct = ((compound_profit - 100000) / 100000) * 100
+    # Compound return simulation
+    compound_return = 1.0
+    for m in buy_months:
+        compound_return *= (1 + monthly_avg[m] / 100)
+    compound_return_pct = (compound_return - 1) * 100
+    compound_profit = 100000 * compound_return_pct / 100
 
-    # Upcoming favorable buy months from today
-    today_month = datetime.today().month
-    upcoming_buy_months = [m for m in buy_months if m >= today_month]
+    # Upcoming favorable buy months (from current month)
+    current_month = datetime.now().month
+    upcoming_buy_months = [m for m in buy_months if m >= current_month]
     upcoming_buy_names = [calendar.month_name[m] for m in upcoming_buy_months]
 
     return {
@@ -120,48 +114,29 @@ def analyze_favorable_times(df, monthly_avg):
         'simple_return_pct': simple_return_pct,
         'simple_profit': simple_profit,
         'compound_return_pct': compound_return_pct,
-        'compound_profit': compound_profit - 100000,
-        'upcoming_buy_names': upcoming_buy_names,
+        'compound_profit': compound_profit,
+        'upcoming_buy_names': upcoming_buy_names
     }
 
 def plot_price_chart(df, ticker):
-    fig = px.line(df.reset_index(), x='Date', y='Price', title=f"Price Chart: {ticker}")
-    fig.update_layout(
-        plot_bgcolor="#0e1117",
-        paper_bgcolor="#0e1117",
-        font=dict(color="#fafafa")
-    )
+    fig = px.line(df, y='Price', title=f"Price Chart for {ticker.upper()}")
+    fig.update_layout(margin=dict(l=20, r=20, t=30, b=20))
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_seasonality_chart(monthly_avg, ticker):
-    months = list(calendar.month_abbr)[1:]
-    data = monthly_avg.reindex(range(1, 13)).fillna(0).values
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=months,
-        y=data,
-        mode='lines+markers',
-        line=dict(color='lime', width=2),
-        marker=dict(size=8),
-        name='Avg Monthly Return %'
-    ))
-    fig.update_layout(
-        title=f"Seasonality Chart: {ticker}",
-        xaxis_title="Month",
-        yaxis_title="Average Monthly Return (%)",
-        plot_bgcolor="#0e1117",
-        paper_bgcolor="#0e1117",
-        font=dict(color="#fafafa"),
-        yaxis=dict(ticksuffix="%")
-    )
+    months = [calendar.month_name[m] for m in monthly_avg.index]
+    returns = monthly_avg.values
+    fig = go.Figure(data=[
+        go.Bar(x=months, y=returns, marker_color=['green' if x > 0 else 'red' for x in returns])
+    ])
+    fig.update_layout(title=f"Seasonality (Avg Monthly Returns %) for {ticker.upper()}",
+                      xaxis_title="Month", yaxis_title="Avg Monthly Return (%)",
+                      margin=dict(l=20, r=20, t=30, b=20))
     st.plotly_chart(fig, use_container_width=True)
 
 def download_link(df):
     csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()
-    href = f'<a href="data:file/csv;base64,{b64}" download="seasonality_data.csv">📥 Download Seasonality Data as CSV</a>'
-    st.markdown(href, unsafe_allow_html=True)
+    st.download_button(label="Download Seasonality Data as CSV", data=csv, file_name="seasonality_data.csv", mime='text/csv')
 
 # ------------------ Main ------------------
 
@@ -186,19 +161,17 @@ if stock_ticker:
                     st.markdown(f"**Upcoming Favorable Buy Months:** {', '.join(results['upcoming_buy_names']) if results['upcoming_buy_names'] else 'None'}")
 
                 with col2:
-                    # Simple Return
                     simple_class = "return-positive" if results['simple_return_pct'] >= 0 else "return-negative"
                     st.markdown(f"<span class='{simple_class}'>Demo Return (Simple Sum): {results['simple_return_pct']:.2f}%</span>", unsafe_allow_html=True)
                     st.markdown(f"Profit on 100,000 PKR: {results['simple_profit']:.2f} PKR")
 
-                    # Compound Return
                     compound_class = "return-positive" if results['compound_return_pct'] >= 0 else "return-negative"
                     st.markdown(f"<span class='{compound_class}'>Compound Return (Simulated): {results['compound_return_pct']:.2f}%</span>", unsafe_allow_html=True)
                     st.markdown(f"Profit on 100,000 PKR: {results['compound_profit']:.2f} PKR")
 
                 st.markdown("---")
 
-                # Show Charts inside cards
+                # Show Charts
                 with st.container():
                     st.markdown("### Price Chart")
                     plot_price_chart(df, stock_ticker)
@@ -207,7 +180,7 @@ if stock_ticker:
                     st.markdown("### Seasonality Chart")
                     plot_seasonality_chart(monthly_avg, stock_ticker)
 
-                # Download button for seasonality data
+                # Prepare seasonality data for download
                 monthly_df = monthly_avg.rename_axis('Month').reset_index()
                 monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
                 monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
