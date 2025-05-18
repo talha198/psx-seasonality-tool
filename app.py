@@ -237,13 +237,18 @@ def display_seasonality_for_ticker(ticker, start, end):
 except Exception as e:
     st.error(f"⚠️ Error for {ticker}: {e}")
 
-# Then after this block, your if/else for predefined/custom
 if predefined:
     st.header("📌 Predefined PSX Stocks")
     for ticker in predefined_tickers:
-        display_seasonality_for_ticker(ticker, start_date, end_date)
+        try:
+            display_seasonality_for_ticker(ticker, start_date, end_date)
+        except Exception as e:
+            st.error(f"⚠️ Error for {ticker}: {e}")
 else:
     st.header(f"📌 Custom Analysis: {custom_ticker.upper()}")
-    display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
+    try:
+        display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
+    except Exception as e:
+        st.error(f"⚠️ Error for {custom_ticker}: {e}")
 
 
