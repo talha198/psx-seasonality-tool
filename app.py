@@ -31,6 +31,36 @@ def set_dark_theme():
         """, unsafe_allow_html=True)
 
 set_dark_theme()
+# Customize file uploader button
+st.markdown("""
+    <style>
+    /* Hide original label */
+    .stFileUploader label {
+        display: none;
+    }
+
+    /* Style the custom button */
+    .custom-upload {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        color: white;
+        background-color: #1E88E5;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-top: 1rem;
+    }
+
+    .custom-upload:hover {
+        background-color: #1565C0;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Show custom-styled uploader with text
+st.markdown('<label class="custom-upload">📂 Browse File</label>', unsafe_allow_html=True)
+uploaded_file = st.file_uploader("", type=["csv"])
+
 
 # ------------------ Functions ------------------
 @st.cache_data
