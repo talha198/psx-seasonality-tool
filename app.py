@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 from psx import PSX  # from the scraper
+import warnings
+
+
 
 st.set_page_config(page_title="PSX Scraper Test", layout="wide")
 
@@ -26,3 +29,4 @@ if st.button("Fetch PSX Data"):
         st.line_chart(df.set_index('date')['close'])
     except Exception as e:
         st.error(f"❌ Failed to fetch data: {e}")
+        warnings.simplefilter(action='ignore', category=FutureWarning)
