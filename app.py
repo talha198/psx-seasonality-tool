@@ -6,7 +6,6 @@ import plotly.express as px
 from datetime import datetime
 import yfinance as yf
 import base64
-from difflib import get_close_matches
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -44,45 +43,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Sidebar ---
-
 st.sidebar.title("🔧 Settings & Filters")
 
-# PSX Tickers List (example subset)
-PSX_TICKERS = [
-    "TRG.PK", "HBL.PK", "ENGRO.PK", "OGDC.PK", "MCB.PK",
-    "UBL.PK", "KEL.PK", "NESTLE.PK", "SNGP.PK", "PSO.PK",
-    "DGKC.PK", "FAUJI.PK", "PPL.PK", "EPCL.PK", "BAFL.PK"
-]
-
-stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK").upper()
-
+stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2015-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
-
-if start_date >= end_date:
-    st.sidebar.error("Error: Start date must be before End date.")
-
-# Show suggestions if ticker is not valid
-if stock_ticker and stock_ticker not in PSX_TICKERS:
-    close_matches = get_close_matches(stock_ticker, PSX_TICKERS, n=3, cutoff=0.5)
-    if close_matches:
-        st.sidebar.info(f"Did you mean: {', '.join(close_matches)}?")
-    else:
-        st.sidebar.warning("Ticker not recognized. Try a valid PSX ticker with .PK suffix.")
 
 st.sidebar.markdown("---")
 st.sidebar.write("⚙️ *Filters coming soon...*")
 
-# API test button
+show_test_data = False
+
 if st.sidebar.button("Test API with Sample Ticker"):
-    try:
-        test_df = yf.download("AAPL", start="2020-01-01", end="2020-12-31", progress=False, auto_adjust=True)
-        if test_df.empty:
-            st.sidebar.error("API test failed: No data returned for AAPL.")
-        else:
-            st.sidebar.success(f"API working! Sample ticker AAPL returned {len(test_df)} rows.")
-    except Exception as e:
-        st.sidebar.error(f"API test failed: {e}")
+    show_test_data = True
 
 # --- Functions ---
 
@@ -90,16 +63,10 @@ if st.sidebar.button("Test API with Sample Ticker"):
 def fetch_stock_data(ticker, start, end):
     if start >= end:
         raise ValueError("Start date must be before end date.")
-    # Validate ticker format quick
-    if not ticker.endswith(".PK"):
-        raise ValueError("Please enter a valid PSX ticker with '.PK' suffix (e.g. TRG.PK)")
-
     df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
     if df.empty:
-        raise ValueError(f"No data found for ticker '{ticker}' in the specified date range.")
+        raise ValueError("No data found for this ticker or date range.")
     df.reset_index(inplace=True)
-    if 'Close' not in df.columns:
-        raise ValueError(f"Data fetched for ticker '{ticker}' does not contain 'Close' prices.")
     df = df[['Date', 'Close']]
     df.rename(columns={'Close': 'Price'}, inplace=True)
     df['Date'] = pd.to_datetime(df['Date'])
@@ -196,49 +163,89 @@ def download_link(df):
 
 # --- Main ---
 
-if stock_ticker and start_date < end_date:
-    with st.spinner(f"Fetching data for {stock_ticker} ..."):
-        try:
-            df = fetch_stock_data(stock_ticker, start_date, end_date)
-            monthly_avg = calculate_seasonality(df)
-            results = analyze_favorable_times(df, monthly_avg)
+if show_test_data:
+    # Show example data for AAPL test
+    try:
+        df = fetch_stock_data("AAPL", "2020-01-01", "2020-12-31")
+        monthly_avg = calculate_seasonality(df)
+        results = analyze_favorable_times(df, monthly_avg)
 
-            st.subheader(f"📈 Seasonality Summary for {stock_ticker.upper()}")
+        st.subheader(f"📈 Seasonality Summary for AAPL (Test Data)")
 
-            col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Favorable Buy Months:** {', '.join(results['buy_month_names']) if results['buy_month_names'] else 'None'}")
+            st.markdown(f"**Favorable Sell Months:** {', '.join(results['sell_month_names']) if results['sell_month_names'] else 'None'}")
+            st.markdown(f"**Upcoming Favorable Buy Months:** {', '.join(results['upcoming_buy_names']) if results['upcoming_buy_names'] else 'None'}")
+        with col2:
+            simple_class = "return-positive" if results['simple_return_pct'] >= 0 else "return-negative"
+            st.markdown(f"<span class='{simple_class}'>Demo Return (Simple Sum): {results['simple_return_pct']:.2f}%</span>", unsafe_allow_html=True)
+            st.markdown(f"Profit on 100,000 PKR: {results['simple_profit']:.2f} PKR")
 
-            with col1:
-                st.markdown(f"**Favorable Buy Months:** {', '.join(results['buy_month_names']) if results['buy_month_names'] else 'None'}")
-                st.markdown(f"**Favorable Sell Months:** {', '.join(results['sell_month_names']) if results['sell_month_names'] else 'None'}")
-                st.markdown(f"**Upcoming Favorable Buy Months:** {', '.join(results['upcoming_buy_names']) if results['upcoming_buy_names'] else 'None'}")
+            compound_class = "return-positive" if results['compound_return_pct'] >= 0 else "return-negative"
+            st.markdown(f"<span class='{compound_class}'>Compound Return (Simulated): {results['compound_return_pct']:.2f}%</span>", unsafe_allow_html=True)
+            st.markdown(f"Profit on 100,000 PKR: {results['compound_profit']:.2f} PKR")
 
-            with col2:
-                simple_class = "return-positive" if results['simple_return_pct'] >= 0 else "return-negative"
-                st.markdown(f"<span class='{simple_class}'>Demo Return (Simple Sum): {results['simple_return_pct']:.2f}%</span>", unsafe_allow_html=True)
-                st.markdown(f"Profit on 100,000 PKR: {results['simple_profit']:.2f} PKR")
+        st.markdown("---")
+        st.markdown("### Price Chart")
+        plot_price_chart(df, "AAPL")
 
-                compound_class = "return-positive" if results['compound_return_pct'] >= 0 else "return-negative"
-                st.markdown(f"<span class='{compound_class}'>Compound Return (Simulated): {results['compound_return_pct']:.2f}%</span>", unsafe_allow_html=True)
-                st.markdown(f"Profit on 100,000 PKR: {results['compound_profit']:.2f} PKR")
+        st.markdown("### Seasonality Chart")
+        plot_seasonality_chart(monthly_avg, "AAPL")
 
-            st.markdown("---")
+        monthly_df = monthly_avg.rename_axis('Month').reset_index()
+        monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
+        monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
+        monthly_df.rename(columns={'Daily Return %': 'Avg Monthly Return (%)'}, inplace=True)
+        download_link(monthly_df)
 
-            st.markdown("### Price Chart")
-            plot_price_chart(df, stock_ticker)
+    except Exception as e:
+        st.error(f"Error fetching AAPL test data: {e}")
 
-            st.markdown("### Seasonality Chart")
-            plot_seasonality_chart(monthly_avg, stock_ticker)
+elif stock_ticker.strip():
+    # User input ticker mode
+    try:
+        df = fetch_stock_data(stock_ticker, start_date, end_date)
+        monthly_avg = calculate_seasonality(df)
+        results = analyze_favorable_times(df, monthly_avg)
 
-            monthly_df = monthly_avg.rename_axis('Month').reset_index()
-            monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
-            monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
-            monthly_df.rename(columns={'Daily Return %': 'Avg Monthly Return (%)'}, inplace=True)
-            download_link(monthly_df)
+        st.subheader(f"📈 Seasonality Summary for {stock_ticker.upper()}")
 
-        except Exception as e:
-            st.error(f"Error fetching data: {e}")
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown(f"**Favorable Buy Months:** {', '.join(results['buy_month_names']) if results['buy_month_names'] else 'None'}")
+            st.markdown(f"**Favorable Sell Months:** {', '.join(results['sell_month_names']) if results['sell_month_names'] else 'None'}")
+            st.markdown(f"**Upcoming Favorable Buy Months:** {', '.join(results['upcoming_buy_names']) if results['upcoming_buy_names'] else 'None'}")
+
+        with col2:
+            simple_class = "return-positive" if results['simple_return_pct'] >= 0 else "return-negative"
+            st.markdown(f"<span class='{simple_class}'>Demo Return (Simple Sum): {results['simple_return_pct']:.2f}%</span>", unsafe_allow_html=True)
+            st.markdown(f"Profit on 100,000 PKR: {results['simple_profit']:.2f} PKR")
+
+            compound_class = "return-positive" if results['compound_return_pct'] >= 0 else "return-negative"
+            st.markdown(f"<span class='{compound_class}'>Compound Return (Simulated): {results['compound_return_pct']:.2f}%</span>", unsafe_allow_html=True)
+            st.markdown(f"Profit on 100,000 PKR: {results['compound_profit']:.2f} PKR")
+
+        st.markdown("---")
+
+        st.markdown("### Price Chart")
+        plot_price_chart(df, stock_ticker)
+
+        st.markdown("### Seasonality Chart")
+        plot_seasonality_chart(monthly_avg, stock_ticker)
+
+        monthly_df = monthly_avg.rename_axis('Month').reset_index()
+        monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
+        monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
+        monthly_df.rename(columns={'Daily Return %': 'Avg Monthly Return (%)'}, inplace=True)
+        download_link(monthly_df)
+
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
+
 else:
-    st.info("Enter a valid PSX stock ticker (e.g. TRG.PK) and ensure Start Date is before End Date.")
+    st.info("Enter a stock ticker symbol (e.g. TRG.PK) in the sidebar to get started.")
 
 # --- Footer ---
 st.markdown("""
