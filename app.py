@@ -1,9 +1,11 @@
-# --- Debug/Test Section ---
-import streamlit as st  # <-- ensure this is at the top if not already present
-st.sidebar.markdown("---")
-run_test = st.sidebar.checkbox("🧪 Run Simple Line Chart Test")
+import streamlit as st
+import pandas as pd
+import yfinance as yf
+import plotly.express as px
 
-if run_test:
+# --- Debug/Test Section ---
+st.sidebar.markdown("---")
+if st.sidebar.checkbox("🧪 Run Simple Line Chart Test"):
     st.header("📉 Simple Line Chart Test")
 
     test_ticker = "OGDC.KA"
@@ -21,4 +23,4 @@ if run_test:
             fig.update_layout(plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"))
             st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
-        st.error(f"Test failed: {e}")
+        st.error(f"❌ Failed to generate line chart: {e}")
