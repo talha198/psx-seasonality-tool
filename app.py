@@ -171,8 +171,7 @@ def analyze_favorable_times(monthly_avg_by_month):
     buy_months = favorable_buy_months[:3]
     sell_months = favorable_sell_months[:3]
 
-    # Calculate demo return by summing average returns for buy months minus sell months
-    # (For simplicity, just sum buy months' returns)
+    # Calculate demo return by summing average returns for buy months
     demo_return_pct = monthly_avg_by_month[buy_months].sum()
 
     # Investment amount
@@ -186,18 +185,6 @@ def analyze_favorable_times(monthly_avg_by_month):
 
     return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount
 
-if uploaded_file:
-    # ... your existing code to load df and calculate monthly_avg_by_month
-
-    # Add this below the charts:
-    buy_months, sell_months, demo_return_pct, profit, final_amount = analyze_favorable_times(monthly_avg_by_month)
-
-    st.markdown("---")
-    st.markdown("### 🔍 Seasonality Insights")
-    st.write(f"**Favorable months to BUY:** {', '.join(buy_months)}")
-    st.write(f"**Favorable months to SELL:** {', '.join(sell_months)}")
-    st.write(f"💰 If you invested 100,000 PKR in the favorable months, estimated return would be: **{demo_return_pct:.2f}%**")
-    st.write(f"📈 This means your investment might grow to approximately: **{final_amount:,.0f} PKR** (profit of {profit:,.0f} PKR)")
 
 
 def plot_price_chart_plotly(df, stock_name):
