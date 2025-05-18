@@ -1,4 +1,11 @@
+# PSX data reader (direct from GitHub)
 git+https://github.com/MuhammadAmir5670/psx-data-reader.git
+
+# Streamlit core
 streamlit
+
+# Data processing
 pandas
+
+# Visualization
 plotly
