@@ -83,44 +83,22 @@ def calculate_seasonality(df):
 def get_first_price_of_month(df):
     return df['Price'].resample('MS').first()
 
-def analyze_favorable_times(df, monthly_avg):
-    buy_months = monthly_avg[monthly_avg > 0].index.tolist()
-    sell_months = monthly_avg[monthly_avg <= 0].index.tolist()
-    buy_month_names = [calendar.month_name[m] for m in buy_months]
-    sell_month_names = [calendar.month_name[m] for m in sell_months]
+first_prices = get_first_price_of_month(df)
+compound_profit = 100000
 
-    simple_return_pct = monthly_avg.loc[buy_months].sum() if buy_months else 0
-    simple_profit = 100000 * simple_return_pct / 100
+if (not first_prices.empty) and (len(buy_months) > 0):
+    month_series = pd.Series(first_prices.index.month, index=first_prices.index)
+    year_series = pd.Series(first_prices.index.year, index=first_prices.index)
 
-    first_prices = get_first_price_of_month(df)
-    compound_profit = 100000
+    for year in year_series.unique():
+        mask = (year_series == year) & (month_series.isin(buy_months))
+        year_month_prices = first_prices[mask]
+        if len(year_month_prices) < 2:
+            continue
+        for i in range(1, len(year_month_prices)):
+            ret = (year_month_prices.iloc[i] - year_month_prices.iloc[i-1]) / year_month_prices.iloc[i-1]
+            compound_profit *= (1 + ret)
 
-    if (not first_prices.empty) and (len(buy_months) > 0):
-        for year in first_prices.index.year.unique():
-            year_month_prices = first_prices[(first_prices.index.year == year) & (first_prices.index.month.isin(buy_months))]
-            if len(year_month_prices) < 2:
-                continue
-            for i in range(1, len(year_month_prices)):
-                ret = (year_month_prices.iloc[i] - year_month_prices.iloc[i-1]) / year_month_prices.iloc[i-1]
-                compound_profit *= (1 + ret)
-
-    compound_return_pct = ((compound_profit - 100000) / 100000) * 100
-
-    today_month = datetime.today().month
-    upcoming_buy_months = [m for m in buy_months if m >= today_month]
-    upcoming_buy_names = [calendar.month_name[m] for m in upcoming_buy_months]
-
-    return {
-        'buy_months': buy_months,
-        'sell_months': sell_months,
-        'buy_month_names': buy_month_names,
-        'sell_month_names': sell_month_names,
-        'simple_return_pct': simple_return_pct,
-        'simple_profit': simple_profit,
-        'compound_return_pct': compound_return_pct,
-        'compound_profit': compound_profit - 100000,
-        'upcoming_buy_names': upcoming_buy_names,
-    }
 
 def plot_price_chart(df, ticker):
     fig = px.line(df.reset_index(), x='Date', y='Price', title=f"Price Chart: {ticker}")
