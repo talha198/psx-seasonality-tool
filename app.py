@@ -98,9 +98,9 @@ def analyze_favorable_times(df, monthly_avg):
 
     if not first_prices.empty and buy_months:
         for year in first_prices.index.year.unique():
-            year_month_prices = first_prices[first_prices.index.year == year].loc[
-                first_prices.index.month.isin(buy_months)
-            ]
+            year_month_prices = first_prices[(first_prices.index.year == year) & (first_prices.index.month.isin(buy_months))]
+            if len(year_month_prices) < 2:
+                continue
             for i in range(1, len(year_month_prices)):
                 ret = (year_month_prices.iloc[i] - year_month_prices.iloc[i-1]) / year_month_prices.iloc[i-1]
                 compound_profit *= (1 + ret)
@@ -121,6 +121,7 @@ def analyze_favorable_times(df, monthly_avg):
         'compound_profit': compound_profit - 100000,
         'upcoming_buy_names': upcoming_buy_names,
     }
+
 
 def plot_price_chart(df, ticker):
     fig = px.line(df.reset_index(), x='Date', y='Price', title=f"Price Chart: {ticker}")
