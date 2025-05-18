@@ -5,8 +5,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 import io
 from datetime import datetime
-import calendar
-
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -54,12 +52,10 @@ h1 {
     margin: auto;
     width: fit-content;
 }
-
 [data-testid="stFileUploader"] > label:hover {
     background-color: #1565C0;
     transform: scale(1.05);
 }
-
 [data-testid="stFileUploader"] span {
     display: none;
 }
@@ -128,11 +124,11 @@ button[kind="primary"]:hover {
 
 /* Colored return text */
 .return-positive {
-    color: #4CAF50;  /* Green */
+    color: #4CAF50;
     font-weight: bold;
 }
 .return-negative {
-    color: #F44336;  /* Red */
+    color: #F44336;
     font-weight: bold;
 }
 </style>
@@ -163,226 +159,195 @@ uploaded_file = st.file_uploader("Upload CSV file with Date, Price", type=["csv"
 @st.cache_data
 def load_data(uploaded_file):
     df = pd.read_csv(uploaded_file)
-    df['Date'] = pd.to_datetime(df['Date'], dayfirst=False)
-    df = df.sort_values('Date')
-    df.set_index('Date', inplace=True)
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df.sort_values('Date').set_index('Date')
     df['Price'] = df['Price'].astype(float)
     df['Daily Return %'] = df['Price'].pct_change() * 100
     return df
 
+
 def calculate_seasonality(df):
-    # Calculate average daily return by month (using month end)
+    # Average daily return by month-end date, then average by month number across years
     monthly_avg = df['Daily Return %'].resample('ME').mean()
-    # Average by month number across years
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
     return monthly_avg_by_month
 
-def analyze_favorable_times(monthly_avg_by_month):
-    # Filter months with positive returns (favorable to buy)
+
+def get_first_price_of_month(df, year, month):
+    """Helper: Find first available price on or after the 1st of given month."""
+    dt = pd.Timestamp(year=year, month=month, day=1)
+    prices = df.loc[df.index >= dt]['Price']
+    if not prices.empty:
+        return prices.iloc[0]
+    return None
+
+
+def analyze_favorable_times(df, monthly_avg_by_month):
+    # Separate favorable buy and sell months by positive/negative avg return
     favorable_buy_months = monthly_avg_by_month[monthly_avg_by_month > 0].sort_values(ascending=False).index.tolist()
-    # Filter months with zero or negative returns (suggest sell)
     favorable_sell_months = monthly_avg_by_month[monthly_avg_by_month <= 0].sort_values().index.tolist()
 
-    # Take top 3 buy months and bottom 3 sell months (handle if less than 3 exist)
-    buy_months = favorable_buy_months[:3] if len(favorable_buy_months) >= 3 else favorable_buy_months
-    sell_months = favorable_sell_months[:3] if len(favorable_sell_months) >= 3 else favorable_sell_months
+    # Top 3 buy and sell months (or fewer if less than 3)
+    buy_months = favorable_buy_months[:3]
+    sell_months = favorable_sell_months[:3]
 
-    # Sum average returns for buy months as a demo return percentage
+    # Demo return if invested 100,000 PKR in buy months' average returns
     demo_return_pct = monthly_avg_by_month.loc[buy_months].sum() if buy_months else 0
-
-    # Fixed investment amount
-    invested_amount = 100000  # 100,000 PKR
+    invested_amount = 100_000
     final_amount = invested_amount * (1 + demo_return_pct / 100)
     profit = final_amount - invested_amount
 
-    # Convert numeric months to month names (e.g. 1 -> January)
-    buy_month_names = [calendar.month_name[m] for m in buy_months]
-    sell_month_names = [calendar.month_name[m] for m in sell_months]
-
-    return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount
-    # Helper: find first price on given month (or closest after)
-    def get_first_price_of_month(year, month):
-        try:
-            # Find the first trading day >= month start
-            dt = pd.Timestamp(year=year, month=month, day=1)
-            prices = df.loc[df.index >= dt]['Price']
-            if len(prices) > 0:
-                return prices.iloc[0], prices.index[0]
-            else:
-                return None, None
-        except Exception:
-            return None, None
-
-    # Calculate compound return by simulating buys on buy_months and sells on sell_months in sequence within a year
+    # Calculate compound return by simulating buy-sell cycles per year
     years = sorted(df.index.year.unique())
     total_return_factor = 1
 
     for year in years:
-        # For each favorable buy month, find buy price
         for buy_month in favorable_buy_months:
-            buy_price, buy_date = get_first_price_of_month(year, buy_month)
+            buy_price = get_first_price_of_month(df, year, buy_month)
             if buy_price is None:
-                continue  # no data for this month/year
+                continue
 
-            # Find closest sell month after buy month in the year (or next year)
+            # Find nearest sell month after buy month within the year or next year
             sell_price = None
             for offset in range(1, 13):
                 candidate_month = ((buy_month - 1 + offset) % 12) + 1
                 candidate_year = year + ((buy_month - 1 + offset) // 12)
                 if candidate_month in favorable_sell_months:
-                    sell_price, sell_date = get_first_price_of_month(candidate_year, candidate_month)
+                    sell_price = get_first_price_of_month(df, candidate_year, candidate_month)
                     if sell_price is not None:
                         break
-            if sell_price is None:
-                # If no sell month found, assume hold till end of year, use last available price
-                sell_price = df.loc[df.index.year == year]['Price'][-1]
 
-            # Calculate return factor for this cycle
+            # If no sell price found, hold till year end
+            if sell_price is None:
+                sell_prices = df.loc[df.index.year == year]['Price']
+                if not sell_prices.empty:
+                    sell_price = sell_prices.iloc[-1]
+                else:
+                    continue
+
             cycle_return = sell_price / buy_price
             total_return_factor *= cycle_return
 
-    final_amount = invested_amount * total_return_factor
-    profit = final_amount - invested_amount
-    demo_return_pct = (total_return_factor - 1) * 100
+    compound_final_amount = invested_amount * total_return_factor
+    compound_profit = compound_final_amount - invested_amount
+    compound_return_pct = (total_return_factor - 1) * 100
 
-    # Determine current month and upcoming favorable buy months
-    today = datetime.today()
-    current_month = today.month
+    # Current month and upcoming favorable buy months
+    current_month = datetime.today().month
     upcoming_buy_months = [m for m in favorable_buy_months if m >= current_month]
     upcoming_buy_names = [calendar.month_name[m] for m in upcoming_buy_months]
 
-    return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount, upcoming_buy_names
+    # Convert numeric months to names
+    buy_month_names = [calendar.month_name[m] for m in buy_months]
+    sell_month_names = [calendar.month_name[m] for m in sell_months]
+
+    return {
+        "buy_month_names": buy_month_names,
+        "sell_month_names": sell_month_names,
+        "simple_return_pct": demo_return_pct,
+        "simple_profit": profit,
+        "simple_final_amount": final_amount,
+        "compound_return_pct": compound_return_pct,
+        "compound_profit": compound_profit,
+        "compound_final_amount": compound_final_amount,
+        "upcoming_buy_names": upcoming_buy_names,
+    }
 
 
-def format_return_color(percentage):
-    if percentage >= 0:
-        return f"<span class='return-positive'>{percentage:.2f}%</span>"
-    else:
-        return f"<span class='return-negative'>{percentage:.2f}%</span>"
-
-def plot_price_chart_plotly(df, stock_name):
-    # Ensure 'Date' is datetime and 'Price' column exists
-    if 'Date' not in df.columns or 'Price' not in df.columns:
-        st.error("Dataframe must contain 'Date' and 'Price' columns.")
-        return
-
-    df['Date'] = pd.to_datetime(df['Date'])
-    
-    fig = px.line(df, x='Date', y='Price', title=f"Price Chart: {stock_name}")
+def plot_price_chart(df, stock_name):
+    fig = px.line(df.reset_index(), x='Date', y='Price', title=f"Price Chart: {stock_name}")
     st.plotly_chart(fig, use_container_width=True)
 
-def plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name):
-    months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+def plot_seasonality_chart(monthly_avg_by_month, stock_name):
+    months = list(calendar.month_abbr)[1:]  # Jan to Dec abbreviations
+    data = monthly_avg_by_month.reindex(range(1, 13)).fillna(0).values
+
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=months,
-        y=monthly_avg_by_month.reindex(range(1,13)).values,
+        y=data,
         mode='lines+markers',
         line=dict(color='lime', width=2),
         marker=dict(size=8),
         name='Avg Monthly Return %'
     ))
     fig.update_layout(
-        title=f'{stock_name} - Avg Monthly Return (%)',
-        xaxis_title='Month',
-        yaxis_title='Avg Return %',
-        template='plotly_dark',
-        hovermode='x unified',
-        xaxis=dict(
-            showgrid=True,
-            gridcolor='rgba(255,255,255,0.15)',
-            tickmode='array',
-            tickvals=months,
-            ticktext=months
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor='rgba(255,255,255,0.15)'
-        ),
-        font=dict(
-            family="Arial, sans-serif",
-            size=12,
-            color="white"
-        ),
-        plot_bgcolor='#0e1117',
-        paper_bgcolor='#0e1117',
+        title=f"Seasonality Chart: {stock_name}",
+        xaxis_title="Month",
+        yaxis_title="Average Monthly Return (%)",
+        plot_bgcolor="#0e1117",
+        paper_bgcolor="#0e1117",
+        font=dict(color="#fafafa"),
+        yaxis=dict(ticksuffix="%")
     )
     st.plotly_chart(fig, use_container_width=True)
 
-def plot_seasonality_heatmap(df, stock_name):
-    df['Year'] = df.index.year
-    df['Month'] = df.index.month
-    pivot = df.pivot_table(values='Daily Return %', index='Year', columns='Month', aggfunc='mean')
 
-    pivot = pivot[range(1, 13)]  # Ensure Jan-Dec order
-    pivot.columns = [calendar.month_abbr[m] for m in pivot.columns]
-
-    fig = px.imshow(pivot,
-                    color_continuous_scale='RdBu_r',
-                    title=f"{stock_name} - Year-wise Monthly Return Heatmap (%)",
-                    labels=dict(x="Month", y="Year", color="Return %"),
-                    aspect="auto",
-                    template='plotly_dark')
-
-    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117', font_color='white')
-    st.plotly_chart(fig, use_container_width=True)
-
-def to_excel(df):
-    output = io.BytesIO()
-    writer = pd.ExcelWriter(output, engine='openpyxl')
-    df.reset_index(inplace=True)
-    df.to_excel(writer, index=False, sheet_name='Seasonality Report')
-    writer.close()
-    return output.getvalue()
+def download_link(df, filename="seasonality_report.csv"):
+    csv = df.to_csv().encode()
+    st.download_button(
+        label="Download Seasonality Data as CSV",
+        data=csv,
+        file_name=filename,
+        mime='text/csv'
+    )
 
 
-# ------------------ App Logic ------------------
-if uploaded_file:
-    # Load and preprocess data
-    df = load_data(uploaded_file)  # expects 'Date' and 'Price' columns
-    monthly_avg_by_month = calculate_seasonality(df)  # seasonality averages by month
+# ------------------ Main ------------------
+if uploaded_file is not None:
+    with st.spinner("Processing data..."):
+        df = load_data(uploaded_file)
+        monthly_avg = calculate_seasonality(df)
+        results = analyze_favorable_times(df, monthly_avg)
 
-    # Create tabs for better UI organization
-    tab1, tab2, tab3 = st.tabs(["📈 Charts", "🌡️ Heatmap", "📤 Export Report"])
+    # Display Summary
+    st.subheader(f"📈 Seasonality Summary for {stock_name}")
 
-    with tab1:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        plot_price_chart_plotly(df, stock_name)  # plot raw price data
-        st.markdown("</div>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
 
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name)  # plot seasonality averages
-        st.markdown("</div>", unsafe_allow_html=True)
+    with col1:
+        st.markdown(f"**Favorable Buy Months:** {', '.join(results['buy_month_names']) if results['buy_month_names'] else 'None'}")
+        st.markdown(f"**Favorable Sell Months:** {', '.join(results['sell_month_names']) if results['sell_month_names'] else 'None'}")
+        st.markdown(f"**Upcoming Favorable Buy Months:** {', '.join(results['upcoming_buy_names']) if results['upcoming_buy_names'] else 'None'}")
 
-        # Favorable time analysis
-        buy_months, sell_months, demo_return_pct, profit, final_amount = analyze_favorable_times(monthly_avg_by_month)
+    with col2:
+        # Simple Return
+        simple_class = "return-positive" if results['simple_return_pct'] >= 0 else "return-negative"
+        st.markdown(f"<span class='{simple_class}'>Demo Return (Simple Sum): {results['simple_return_pct']:.2f}%</span>", unsafe_allow_html=True)
+        st.markdown(f"Profit on 100,000 PKR: {results['simple_profit']:.2f} PKR")
 
-        st.markdown("---")
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown("### 🔍 Favorable Time Analysis & Demo Return")
-        st.write(f"**Favorable months to BUY:** {', '.join(buy_months)}")
-        st.write(f"**Favorable months to SELL:** {', '.join(sell_months)}")
-        st.write(f"💰 If you invested 100,000 PKR in these months, estimated return would be: **{demo_return_pct:.2f}%**")
-        st.write(f"📈 This means your investment might grow to approximately: **{final_amount:,.0f} PKR** (profit of {profit:,.0f} PKR)")
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Compound Return
+        compound_class = "return-positive" if results['compound_return_pct'] >= 0 else "return-negative"
+        st.markdown(f"<span class='{compound_class}'>Compound Return (Simulated): {results['compound_return_pct']:.2f}%</span>", unsafe_allow_html=True)
+        st.markdown(f"Profit on 100,000 PKR: {results['compound_profit']:.2f} PKR")
 
-    with tab2:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        plot_seasonality_heatmap(df, stock_name)  # heatmap for monthly returns by year
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("---")
 
-    with tab3:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.write("Download the seasonality report as an Excel file:")
-        excel_data = to_excel(df)
-        st.download_button(
-            label="📥 Download Excel",
-            data=excel_data,
-            file_name=f"{stock_name}_seasonality_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Show Charts inside cards
+    with st.container():
+        st.markdown("### Price Chart")
+        plot_price_chart(df, stock_name)
+
+    with st.container():
+        st.markdown("### Seasonality Chart")
+        plot_seasonality_chart(monthly_avg, stock_name)
+
+    # Download button for seasonality data
+    monthly_df = monthly_avg.rename_axis('Month').reset_index()
+    monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
+    monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
+    monthly_df.rename(columns={'Daily Return %': 'Avg Monthly Return (%)'}, inplace=True)
+
+    download_link(monthly_df)
 
 else:
-    st.info("Please upload a CSV file with at least 'Date' and 'Price' columns to begin.")
+    st.info("Please upload a CSV file with columns: Date, Price to proceed.")
 
+
+# ------------------ Footer ------------------
+st.markdown("""
+<div style='text-align:center; margin-top:3rem; color:#666; font-size:12px;'>
+    © 2025 PSX SEASONX | Developed by YourName
+</div>
+""", unsafe_allow_html=True)
