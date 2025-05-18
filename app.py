@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-from psx import get_data
 import warnings
+from psx import PSX  # ✅ correct import
 
 st.set_page_config(page_title="PSX Scraper Test", layout="wide")
 st.title("🧪 PSX Data Reader Test")
@@ -12,10 +12,10 @@ end_date = st.date_input("End Date", pd.to_datetime("today"))
 
 if st.button("Fetch PSX Data"):
     try:
-        data = get_data(ticker)
-        df = pd.DataFrame(data)
+        psx = PSX()  # ✅ instantiating PSX correctly
+        data = psx.get_data(ticker)  # returns a list of dicts
 
-        # Convert date and filter
+        df = pd.DataFrame(data)
         df['date'] = pd.to_datetime(df['date'])
         df = df[(df['date'] >= pd.to_datetime(start_date)) & (df['date'] <= pd.to_datetime(end_date))]
 
