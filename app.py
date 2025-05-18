@@ -5,7 +5,6 @@ import calendar
 import io
 from fpdf import FPDF
 import plotly.graph_objects as go
-import plotly.express as px
 
 st.set_page_config(page_title="PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -28,38 +27,11 @@ def set_dark_theme():
             padding: 2rem;
         }
         </style>
-        """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 set_dark_theme()
-# Customize file uploader button
-st.markdown("""
-    <style>
-    /* Hide original label */
-    .stFileUploader label {
-        display: none;
-    }
 
-    /* Style the custom button */
-    .custom-upload {
-        display: inline-block;
-        padding: 0.5rem 1rem;
-        font-weight: 600;
-        color: white;
-        background-color: #1E88E5;
-        border-radius: 8px;
-        cursor: pointer;
-        margin-top: 1rem;
-    }
-
-    .custom-upload:hover {
-        background-color: #1565C0;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# Show custom-styled uploader with text
-st.markdown('<label class="custom-upload">📂 Browse File</label>', unsafe_allow_html=True)
-# Custom styled file uploader
+# ------------------ Custom Styled File Uploader ------------------
 st.markdown("""
     <style>
     [data-testid="stFileUploader"] > label {
@@ -81,19 +53,20 @@ st.markdown("""
         background-color: #1565C0;
     }
 
-    [data-testid="stFileUploader"] > label::after {
+    [data-testid="stFileUploader"] > label div::before {
         content: "📂 Browse File";
     }
 
     [data-testid="stFileUploader"] span {
-        display: none; /* Hide the default "Drag and drop..." text */
+        display: none;
     }
     </style>
 """, unsafe_allow_html=True)
 
+# ------------------ App UI ------------------
+st.title("📊 PSX SEASONX - Pakistan Stock Seasonality Intelligence Tool")
+
 uploaded_file = st.file_uploader("", type=["csv"])
-
-
 
 # ------------------ Functions ------------------
 @st.cache_data
@@ -111,7 +84,6 @@ def calculate_seasonality(df):
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
     return monthly_avg_by_month
 
-# Price chart with crosshair and zoom
 def plot_price_chart_plotly(df, stock_name):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df.index, y=df['Price'], mode='lines', line=dict(color='cyan'), name='Closing Price'))
@@ -143,7 +115,7 @@ def plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name):
         hovermode='x unified',
         xaxis=dict(
             showgrid=True,
-            gridcolor='rgba(255,255,255,0.15)',  # subtle grid lines
+            gridcolor='rgba(255,255,255,0.15)',
             tickmode='array',
             tickvals=months,
             ticktext=months
@@ -166,9 +138,7 @@ def plot_seasonality_heatmap(df, stock_name):
     df['Year'] = df.index.year
     df['Month'] = df.index.month
     pivot = df.pivot_table(values='Daily Return %', index='Year', columns='Month', aggfunc='mean')
-
-    # Prepare data for heatmap
-    pivot = pivot[range(1, 13)]  # Ensure columns in order Jan-Dec
+    pivot = pivot[range(1, 13)]
     pivot.columns = [calendar.month_abbr[m] for m in pivot.columns]
 
     fig = px.imshow(pivot,
@@ -178,8 +148,11 @@ def plot_seasonality_heatmap(df, stock_name):
                     aspect="auto",
                     template='plotly_dark')
 
-    fig.update_layout(plot_bgcolor='#0e1117', paper_bgcolor='#0e1117',
-                      font_color='white')
+    fig.update_layout(
+        plot_bgcolor='#0e1117',
+        paper_bgcolor='#0e1117',
+        font_color='white'
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 def to_excel(df):
@@ -189,11 +162,7 @@ def to_excel(df):
     writer.close()
     return output.getvalue()
 
-# ------------------ App UI ------------------
-
-st.title("📊 PSX SEASONX - Pakistan Stock Seasonality Intelligence Tool")
-
-uploaded_file = st.file_uploader("Upload a CSV file (Date, Price)", type=["csv"])
+# ------------------ Main Logic ------------------
 
 if uploaded_file:
     stock_name = st.text_input("Enter Stock Name", value="PSX Stock")
@@ -212,7 +181,6 @@ if uploaded_file:
 
     with tab3:
         st.subheader("📥 Download Seasonality Report")
-
         excel_data = to_excel(monthly_avg_by_month.rename_axis('Month').reset_index())
         st.download_button(
             label="📊 Download Excel",
