@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
-from psx import PSX  # from the scraper
+from psx import get_data
+
 import warnings
 
 
