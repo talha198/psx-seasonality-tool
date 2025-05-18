@@ -6,6 +6,7 @@ import plotly.express as px
 from datetime import datetime
 import yfinance as yf
 import base64
+from difflib import get_close_matches
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -43,11 +44,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Sidebar ---
+
 st.sidebar.title("🔧 Settings & Filters")
 
-stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")
+# PSX Tickers List (example subset)
+PSX_TICKERS = [
+    "TRG.PK", "HBL.PK", "ENGRO.PK", "OGDC.PK", "MCB.PK",
+    "UBL.PK", "KEL.PK", "NESTLE.PK", "SNGP.PK", "PSO.PK",
+    "DGKC.PK", "FAUJI.PK", "PPL.PK", "EPCL.PK", "BAFL.PK"
+]
+
+stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK").upper()
+
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2015-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
+
+if start_date >= end_date:
+    st.sidebar.error("Error: Start date must be before End date.")
+
+# Show suggestions if ticker is not valid
+if stock_ticker and stock_ticker not in PSX_TICKERS:
+    close_matches = get_close_matches(stock_ticker, PSX_TICKERS, n=3, cutoff=0.5)
+    if close_matches:
+        st.sidebar.info(f"Did you mean: {', '.join(close_matches)}?")
+    else:
+        st.sidebar.warning("Ticker not recognized. Try a valid PSX ticker with .PK suffix.")
 
 st.sidebar.markdown("---")
 st.sidebar.write("⚙️ *Filters coming soon...*")
@@ -69,10 +90,16 @@ if st.sidebar.button("Test API with Sample Ticker"):
 def fetch_stock_data(ticker, start, end):
     if start >= end:
         raise ValueError("Start date must be before end date.")
+    # Validate ticker format quick
+    if not ticker.endswith(".PK"):
+        raise ValueError("Please enter a valid PSX ticker with '.PK' suffix (e.g. TRG.PK)")
+
     df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
     if df.empty:
-        raise ValueError("No data found for this ticker or date range.")
+        raise ValueError(f"No data found for ticker '{ticker}' in the specified date range.")
     df.reset_index(inplace=True)
+    if 'Close' not in df.columns:
+        raise ValueError(f"Data fetched for ticker '{ticker}' does not contain 'Close' prices.")
     df = df[['Date', 'Close']]
     df.rename(columns={'Close': 'Price'}, inplace=True)
     df['Date'] = pd.to_datetime(df['Date'])
@@ -169,7 +196,7 @@ def download_link(df):
 
 # --- Main ---
 
-if stock_ticker:
+if stock_ticker and start_date < end_date:
     with st.spinner(f"Fetching data for {stock_ticker} ..."):
         try:
             df = fetch_stock_data(stock_ticker, start_date, end_date)
@@ -211,7 +238,7 @@ if stock_ticker:
         except Exception as e:
             st.error(f"Error fetching data: {e}")
 else:
-    st.info("Enter a stock ticker symbol (e.g. TRG.PK) in the sidebar to get started.")
+    st.info("Enter a valid PSX stock ticker (e.g. TRG.PK) and ensure Start Date is before End Date.")
 
 # --- Footer ---
 st.markdown("""
