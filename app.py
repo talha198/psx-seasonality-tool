@@ -155,6 +155,28 @@ def display_seasonality_for_ticker(ticker, start, end):
         monthly_avg = calculate_seasonality(df)
         results = analyze_favorable_times(df, monthly_avg)
 
+        # Calculate returns for favorable buy months
+        buy_months = [calendar.month_name.index(m) for m in results['buy_month_names']]  # convert names to month numbers
+        
+        simple_return = 0.0
+        compound_return = 1.0
+        prev_price = None
+
+        for date, price in zip(df.index, df['Close'].values):
+            if date.month in buy_months:
+                if prev_price is not None:
+                    simple_return += (price - prev_price) / prev_price
+                    compound_return *= (price / prev_price)
+                prev_price = price
+
+        results['simple_return_pct'] = simple_return * 100
+        results['compound_return_pct'] = (compound_return - 1) * 100
+
+        # Assuming investment amount for profit calculations
+        investment_amount = 100_000
+        results['simple_profit'] = investment_amount * (simple_return)
+        results['compound_profit'] = investment_amount * (compound_return - 1)
+
         st.subheader(f"📈 Seasonality Summary for {ticker.upper()}")
 
         col1, col2 = st.columns(2)
@@ -211,12 +233,3 @@ def display_seasonality_for_ticker(ticker, start, end):
 
     except Exception as e:
         st.error(f"⚠️ Error for {ticker}: {e}")
-
-# --- Main Execution ---
-if predefined:
-    st.header("📌 Predefined PSX Stocks")
-    for ticker in predefined_tickers:
-        display_seasonality_for_ticker(ticker, start_date, end_date)
-else:
-    st.header(f"📌 Custom Analysis: {custom_ticker.upper()}")
-    display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
