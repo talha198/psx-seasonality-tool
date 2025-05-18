@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import io
 from datetime import datetime
+import calendar
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -175,22 +176,29 @@ def calculate_seasonality(df):
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
     return monthly_avg_by_month
 
-def analyze_favorable_times(df, monthly_avg_by_month):
-    # Find favorable buy months (top 3 months with positive avg returns)
-    favorable_buy_months = monthly_avg_by_month[monthly_avg_by_month > 0].sort_values(ascending=False).index.tolist()[:3]
-    # Find favorable sell months (lowest 3 months <= 0)
-    favorable_sell_months = monthly_avg_by_month[monthly_avg_by_month <= 0].sort_values().index.tolist()[:3]
+def analyze_favorable_times(monthly_avg_by_month):
+    # Filter months with positive returns (favorable to buy)
+    favorable_buy_months = monthly_avg_by_month[monthly_avg_by_month > 0].sort_values(ascending=False).index.tolist()
+    # Filter months with zero or negative returns (suggest sell)
+    favorable_sell_months = monthly_avg_by_month[monthly_avg_by_month <= 0].sort_values().index.tolist()
 
-    # Convert to month names
-    buy_month_names = [calendar.month_name[m] for m in favorable_buy_months]
-    sell_month_names = [calendar.month_name[m] for m in favorable_sell_months]
+    # Take top 3 buy months and bottom 3 sell months (handle if less than 3 exist)
+    buy_months = favorable_buy_months[:3] if len(favorable_buy_months) >= 3 else favorable_buy_months
+    sell_months = favorable_sell_months[:3] if len(favorable_sell_months) >= 3 else favorable_sell_months
 
-    # Calculate actual return based on price differences between buy/sell months
-    invested_amount = 100000
+    # Sum average returns for buy months as a demo return percentage
+    demo_return_pct = monthly_avg_by_month.loc[buy_months].sum() if buy_months else 0
 
-    # Get first date of each month present in data
-    months_in_data = df.index.to_period('M').unique().to_timestamp()
+    # Fixed investment amount
+    invested_amount = 100000  # 100,000 PKR
+    final_amount = invested_amount * (1 + demo_return_pct / 100)
+    profit = final_amount - invested_amount
 
+    # Convert numeric months to month names (e.g. 1 -> January)
+    buy_month_names = [calendar.month_name[m] for m in buy_months]
+    sell_month_names = [calendar.month_name[m] for m in sell_months]
+
+    return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount
     # Helper: find first price on given month (or closest after)
     def get_first_price_of_month(year, month):
         try:
