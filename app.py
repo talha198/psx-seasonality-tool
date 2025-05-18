@@ -92,11 +92,19 @@ def analyze_favorable_times(df, monthly_avg):
     upcoming_buy = [(today_month + i - 1) % 12 + 1 for i in range(6) if ((today_month + i - 1) % 12 + 1) in buy_months]
 
     first_prices = get_first_price_of_month(df)
+
+    # Debug print to check index type
+    st.write("first_prices.index types:", type(first_prices.index), first_prices.index)
+
     simple_return = 0
     compound_return = 1
 
     prev_price = None
     for date, price in first_prices.items():
+        # Before accessing date.month, convert if necessary
+        if isinstance(date, str):
+            date = pd.to_datetime(date)
+
         if date.month in buy_months:
             if prev_price is not None:
                 simple_return += (price - prev_price) / prev_price
