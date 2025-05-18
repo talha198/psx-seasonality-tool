@@ -71,6 +71,8 @@ def fetch_stock_data(ticker, start, end):
     df.set_index('Date', inplace=True)       # <-- Set datetime index here
     df['Daily Return %'] = df['Price'].pct_change() * 100
     return df
+print(type(df.index))
+print(df.index)
 
 
 def calculate_seasonality(df):
