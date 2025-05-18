@@ -61,18 +61,17 @@ predefined_tickers = ["TRG.PK", "OGDC.KA", "ENGRO.KA", "HBL.KA", "LUCK.KA"]
 
 @st.cache_data(show_spinner=False)
 def fetch_stock_data(ticker, start, end):
-    if start >= end:
-        raise ValueError("Start date must be before end date.")
     df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
     if df.empty:
         raise ValueError(f"No data found for ticker '{ticker}' or date range.")
     df.reset_index(inplace=True)
     df = df[['Date', 'Close']]
     df.rename(columns={'Close': 'Price'}, inplace=True)
-    df['Date'] = pd.to_datetime(df['Date'])
-    df.set_index('Date', inplace=True)
+    df['Date'] = pd.to_datetime(df['Date'])  # <-- Make sure this conversion is done
+    df.set_index('Date', inplace=True)       # <-- Set datetime index here
     df['Daily Return %'] = df['Price'].pct_change() * 100
     return df
+
 
 def calculate_seasonality(df):
     monthly_avg = df['Daily Return %'].groupby(df.index.month).mean()
