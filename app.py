@@ -280,7 +280,7 @@ if uploaded_file:
     plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- Add this block for favorable times & demo return ---
+    # --- Favorable time analysis card ---
     buy_months, sell_months, demo_return_pct, profit, final_amount = analyze_favorable_times(monthly_avg_by_month)
 
     st.markdown("---")
@@ -291,6 +291,7 @@ if uploaded_file:
     st.write(f"💰 If you invested 100,000 PKR in these favorable months, estimated return would be: **{demo_return_pct:.2f}%**")
     st.write(f"📈 This means your investment might grow to approximately: **{final_amount:,.0f} PKR** (profit of {profit:,.0f} PKR)")
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 
     with tab2:
