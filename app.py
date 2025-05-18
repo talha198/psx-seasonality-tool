@@ -231,9 +231,14 @@ def display_seasonality_for_ticker(ticker, start, end):
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    except Exception as e:
-        st.error(f"⚠️ Error for {ticker}: {e}")
-        if predefined:
+    try:
+    # your main logic here
+    pass
+except Exception as e:
+    st.error(f"⚠️ Error for {ticker}: {e}")
+
+# Make sure this is OUTSIDE the try-except block, aligned at base level
+if predefined:
     st.header("📌 Predefined PSX Stocks")
     for ticker in predefined_tickers:
         display_seasonality_for_ticker(ticker, start_date, end_date)
