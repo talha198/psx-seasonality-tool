@@ -232,12 +232,12 @@ def display_seasonality_for_ticker(ticker, start, end):
         st.markdown("</div>", unsafe_allow_html=True)
 
     try:
-    # your main logic here
-    pass
+    # e.g., call your function that might fail
+    display_seasonality_for_ticker(ticker, start_date, end_date)
 except Exception as e:
     st.error(f"⚠️ Error for {ticker}: {e}")
 
-# Make sure this is OUTSIDE the try-except block, aligned at base level
+# Then after this block, your if/else for predefined/custom
 if predefined:
     st.header("📌 Predefined PSX Stocks")
     for ticker in predefined_tickers:
@@ -245,4 +245,5 @@ if predefined:
 else:
     st.header(f"📌 Custom Analysis: {custom_ticker.upper()}")
     display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
+
 
