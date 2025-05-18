@@ -160,6 +160,45 @@ def calculate_seasonality(df):
     monthly_avg = df['Daily Return %'].resample('ME').mean()
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
     return monthly_avg_by_month
+    
+def analyze_favorable_times(monthly_avg_by_month):
+    # Get months with positive returns (favorable to buy)
+    favorable_buy_months = monthly_avg_by_month[monthly_avg_by_month > 0].sort_values(ascending=False).index.tolist()
+    # Get months with negative returns (suggest sell)
+    favorable_sell_months = monthly_avg_by_month[monthly_avg_by_month <= 0].sort_values().index.tolist()
+
+    # For demo, take top 3 buy months and bottom 3 sell months
+    buy_months = favorable_buy_months[:3]
+    sell_months = favorable_sell_months[:3]
+
+    # Calculate demo return by summing average returns for buy months minus sell months
+    # (For simplicity, just sum buy months' returns)
+    demo_return_pct = monthly_avg_by_month[buy_months].sum()
+
+    # Investment amount
+    invested_amount = 100000  # 100k PKR
+    final_amount = invested_amount * (1 + demo_return_pct / 100)
+    profit = final_amount - invested_amount
+
+    # Convert month numbers to names
+    buy_month_names = [calendar.month_name[m] for m in buy_months]
+    sell_month_names = [calendar.month_name[m] for m in sell_months]
+
+    return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount
+
+if uploaded_file:
+    # ... your existing code to load df and calculate monthly_avg_by_month
+
+    # Add this below the charts:
+    buy_months, sell_months, demo_return_pct, profit, final_amount = analyze_favorable_times(monthly_avg_by_month)
+
+    st.markdown("---")
+    st.markdown("### 🔍 Seasonality Insights")
+    st.write(f"**Favorable months to BUY:** {', '.join(buy_months)}")
+    st.write(f"**Favorable months to SELL:** {', '.join(sell_months)}")
+    st.write(f"💰 If you invested 100,000 PKR in the favorable months, estimated return would be: **{demo_return_pct:.2f}%**")
+    st.write(f"📈 This means your investment might grow to approximately: **{final_amount:,.0f} PKR** (profit of {profit:,.0f} PKR)")
+
 
 def plot_price_chart_plotly(df, stock_name):
     fig = go.Figure()
