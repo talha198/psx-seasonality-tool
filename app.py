@@ -84,7 +84,6 @@ def get_first_price_of_month(df):
     df.index = pd.to_datetime(df.index)  # Ensure datetime index
     return df['Price'].resample('MS').first()
 
-
 def analyze_favorable_times(df, monthly_avg):
     buy_months = monthly_avg[monthly_avg > 0].index.tolist()
     sell_months = monthly_avg[monthly_avg < 0].index.tolist()
@@ -93,18 +92,12 @@ def analyze_favorable_times(df, monthly_avg):
 
     first_prices = get_first_price_of_month(df)
 
-    # Debug print to check index type
-    st.write("first_prices.index types:", type(first_prices.index), first_prices.index)
-
     simple_return = 0
     compound_return = 1
-
     prev_price = None
     for date, price in first_prices.items():
-        # Before accessing date.month, convert if necessary
         if isinstance(date, str):
             date = pd.to_datetime(date)
-
         if date.month in buy_months:
             if prev_price is not None:
                 simple_return += (price - prev_price) / prev_price
@@ -139,7 +132,11 @@ def plot_seasonality_chart(monthly_avg, ticker):
     data = monthly_avg.reindex(range(1, 13)).fillna(0).values
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=months, y=data, mode='lines+markers', line=dict(color='lime', width=2), marker=dict(size=8)))
-    fig.update_layout(title=f"Seasonality Chart: {ticker}", xaxis_title="Month", yaxis_title="Average Monthly Return (%)", plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"), yaxis=dict(ticksuffix="%"))
+    fig.update_layout(
+        title=f"Seasonality Chart: {ticker}", xaxis_title="Month", yaxis_title="Average Monthly Return (%)",
+        plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"),
+        yaxis=dict(ticksuffix="%")
+    )
     st.plotly_chart(fig, use_container_width=True)
 
 def download_link(df):
@@ -162,7 +159,7 @@ def display_seasonality_for_ticker(ticker, start, end):
         compound_return = 1.0
         prev_price = None
 
-        for date, price in zip(df.index, df['Close'].values):
+        for date, price in zip(df.index, df['Price'].values):
             if date.month in buy_months:
                 if prev_price is not None:
                     simple_return += (price - prev_price) / prev_price
@@ -172,9 +169,8 @@ def display_seasonality_for_ticker(ticker, start, end):
         results['simple_return_pct'] = simple_return * 100
         results['compound_return_pct'] = (compound_return - 1) * 100
 
-        # Assuming investment amount for profit calculations
         investment_amount = 100_000
-        results['simple_profit'] = investment_amount * (simple_return)
+        results['simple_profit'] = investment_amount * simple_return
         results['compound_profit'] = investment_amount * (compound_return - 1)
 
         st.subheader(f"📈 Seasonality Summary for {ticker.upper()}")
@@ -220,7 +216,11 @@ def display_seasonality_for_ticker(ticker, start, end):
             marker_color=['lime' if x >= 0 else 'tomato' for x in forecast_returns],
             name='Forecasted Avg Monthly Return %'
         ))
-        fig.update_layout(title=f"Forward Seasonality Forecast: {ticker}", xaxis_title="Month", yaxis_title="Avg Monthly Return (%)", plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"), yaxis=dict(ticksuffix="%"))
+        fig.update_layout(
+            title=f"Forward Seasonality Forecast: {ticker}", xaxis_title="Month", yaxis_title="Avg Monthly Return (%)",
+            plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"),
+            yaxis=dict(ticksuffix="%")
+        )
         st.plotly_chart(fig, use_container_width=True)
 
         monthly_df = monthly_avg.rename_axis('Month').reset_index()
@@ -230,25 +230,13 @@ def display_seasonality_for_ticker(ticker, start, end):
         download_link(monthly_df)
 
         st.markdown("</div>", unsafe_allow_html=True)
-
-    try:
-    # e.g., call your function that might fail
-    display_seasonality_for_ticker(ticker, start_date, end_date)
-except Exception as e:
-    st.error(f"⚠️ Error for {ticker}: {e}")
+    except Exception as e:
+        st.error(f"⚠️ Error for {ticker}: {e}")
 
 if predefined:
     st.header("📌 Predefined PSX Stocks")
     for ticker in predefined_tickers:
-        try:
-            display_seasonality_for_ticker(ticker, start_date, end_date)
-        except Exception as e:
-            st.error(f"⚠️ Error for {ticker}: {e}")
+        display_seasonality_for_ticker(ticker, start_date, end_date)
 else:
     st.header(f"📌 Custom Analysis: {custom_ticker.upper()}")
-    try:
-        display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
-    except Exception as e:
-        st.error(f"⚠️ Error for {custom_ticker}: {e}")
-
-
+    display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
