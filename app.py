@@ -67,13 +67,10 @@ def fetch_stock_data(ticker, start, end):
     df.reset_index(inplace=True)
     df = df[['Date', 'Close']]
     df.rename(columns={'Close': 'Price'}, inplace=True)
-    df['Date'] = pd.to_datetime(df['Date'])  # <-- Make sure this conversion is done
-    df.set_index('Date', inplace=True)       # <-- Set datetime index here
+    df['Date'] = pd.to_datetime(df['Date'])  # Ensure datetime conversion here
+    df.set_index('Date', inplace=True)       # Set datetime index here
     df['Daily Return %'] = df['Price'].pct_change() * 100
     return df
-print(type(df.index))
-print(df.index)
-
 
 def calculate_seasonality(df):
     monthly_avg = df['Daily Return %'].groupby(df.index.month).mean()
@@ -97,8 +94,14 @@ def analyze_favorable_times(df, monthly_avg):
     compound_return = 1
     prev_price = None
     for date, price in first_prices.items():
-        if isinstance(date, str):
-            date = pd.to_datetime(date)
+        # Defensive date parsing: only convert if not datetime already
+        try:
+            if not isinstance(date, pd.Timestamp):
+                date = pd.to_datetime(date)
+        except Exception:
+            st.warning(f"Skipping invalid date: {date}")
+            continue
+
         if date.month in buy_months:
             if prev_price is not None:
                 simple_return += (price - prev_price) / prev_price
