@@ -83,60 +83,59 @@ def calculate_seasonality(df):
 def get_first_price_of_month(df):
     return df['Price'].resample('MS').first()
 
-first_prices = get_first_price_of_month(df)
-compound_profit = 100000
+def analyze_favorable_times(df, monthly_avg):
+    buy_months = monthly_avg[monthly_avg > 0].index.tolist()
+    sell_months = monthly_avg[monthly_avg < 0].index.tolist()
+    today_month = datetime.today().month
+    upcoming_buy = [(today_month + i - 1) % 12 + 1 for i in range(6) if ((today_month + i - 1) % 12 + 1) in buy_months]
 
-if (not first_prices.empty) and (len(buy_months) > 0):
-    month_series = pd.Series(first_prices.index.month, index=first_prices.index)
-    year_series = pd.Series(first_prices.index.year, index=first_prices.index)
+    first_prices = get_first_price_of_month(df)
+    simple_return = 0
+    compound_return = 1
 
-    for year in year_series.unique():
-        mask = (year_series == year) & (month_series.isin(buy_months))
-        year_month_prices = first_prices[mask]
-        if len(year_month_prices) < 2:
-            continue
-        for i in range(1, len(year_month_prices)):
-            ret = (year_month_prices.iloc[i] - year_month_prices.iloc[i-1]) / year_month_prices.iloc[i-1]
-            compound_profit *= (1 + ret)
+    prev_price = None
+    for date, price in first_prices.items():
+        if date.month in buy_months:
+            if prev_price is not None:
+                simple_return += (price - prev_price) / prev_price
+                compound_return *= (price / prev_price)
+            prev_price = price
 
+    simple_return_pct = simple_return * 100
+    simple_profit = 100000 * (1 + simple_return)
+    compound_profit = 100000 * compound_return
+    compound_return_pct = (compound_return - 1) * 100
+
+    return {
+        "buy_months": buy_months,
+        "sell_months": sell_months,
+        "upcoming_buy": upcoming_buy,
+        "buy_month_names": [calendar.month_name[m] for m in buy_months],
+        "sell_month_names": [calendar.month_name[m] for m in sell_months],
+        "upcoming_buy_names": [calendar.month_name[m] for m in upcoming_buy],
+        "simple_return_pct": simple_return_pct,
+        "simple_profit": simple_profit,
+        "compound_return_pct": compound_return_pct,
+        "compound_profit": compound_profit
+    }
 
 def plot_price_chart(df, ticker):
     fig = px.line(df.reset_index(), x='Date', y='Price', title=f"Price Chart: {ticker}")
-    fig.update_layout(
-        plot_bgcolor="#0e1117",
-        paper_bgcolor="#0e1117",
-        font=dict(color="#fafafa")
-    )
+    fig.update_layout(plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"))
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_seasonality_chart(monthly_avg, ticker):
     months = list(calendar.month_abbr)[1:]
     data = monthly_avg.reindex(range(1, 13)).fillna(0).values
-
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=months,
-        y=data,
-        mode='lines+markers',
-        line=dict(color='lime', width=2),
-        marker=dict(size=8),
-        name='Avg Monthly Return %'
-    ))
-    fig.update_layout(
-        title=f"Seasonality Chart: {ticker}",
-        xaxis_title="Month",
-        yaxis_title="Average Monthly Return (%)",
-        plot_bgcolor="#0e1117",
-        paper_bgcolor="#0e1117",
-        font=dict(color="#fafafa"),
-        yaxis=dict(ticksuffix="%")
-    )
+    fig.add_trace(go.Scatter(x=months, y=data, mode='lines+markers', line=dict(color='lime', width=2), marker=dict(size=8)))
+    fig.update_layout(title=f"Seasonality Chart: {ticker}", xaxis_title="Month", yaxis_title="Average Monthly Return (%)", plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"), yaxis=dict(ticksuffix="%"))
     st.plotly_chart(fig, use_container_width=True)
 
 def download_link(df):
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
-    href = f'<a href="data:file/csv;base64,{b64}" download="seasonality_data.csv">📥 Download Seasonality Data as CSV</a>'
+    href = f'<a href="data:file/csv;base64,{b64}" download="seasonality_data.csv">📅 Download Seasonality Data as CSV</a>'
     st.markdown(href, unsafe_allow_html=True)
 
 def display_seasonality_for_ticker(ticker, start, end):
@@ -167,7 +166,6 @@ def display_seasonality_for_ticker(ticker, start, end):
         st.markdown("### Seasonality Chart")
         plot_seasonality_chart(monthly_avg, ticker)
 
-        # Forecast next 6 months
         st.markdown("### 🔮 Forward-Looking Seasonality Forecast (Next 6 Months)")
         today_month = datetime.today().month
         next_6_months = [(today_month + i - 1) % 12 + 1 for i in range(6)]
@@ -190,18 +188,9 @@ def display_seasonality_for_ticker(ticker, start, end):
             marker_color=['lime' if x >= 0 else 'tomato' for x in forecast_returns],
             name='Forecasted Avg Monthly Return %'
         ))
-        fig.update_layout(
-            title=f"Forward Seasonality Forecast: {ticker}",
-            xaxis_title="Month",
-            yaxis_title="Avg Monthly Return (%)",
-            plot_bgcolor="#0e1117",
-            paper_bgcolor="#0e1117",
-            font=dict(color="#fafafa"),
-            yaxis=dict(ticksuffix="%")
-        )
+        fig.update_layout(title=f"Forward Seasonality Forecast: {ticker}", xaxis_title="Month", yaxis_title="Avg Monthly Return (%)", plot_bgcolor="#0e1117", paper_bgcolor="#0e1117", font=dict(color="#fafafa"), yaxis=dict(ticksuffix="%"))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Download
         monthly_df = monthly_avg.rename_axis('Month').reset_index()
         monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
         monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
