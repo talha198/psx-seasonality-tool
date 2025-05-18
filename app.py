@@ -4,6 +4,7 @@ import calendar
 import plotly.graph_objects as go
 import plotly.express as px
 import io
+from datetime import datetime
 
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
@@ -122,6 +123,16 @@ button[kind="primary"]:hover {
 .sidebar .sidebar-content h2 {
     color: #29b6f6;
 }
+
+/* Colored return text */
+.return-positive {
+    color: #4CAF50;  /* Green */
+    font-weight: bold;
+}
+.return-negative {
+    color: #F44336;  /* Red */
+    font-weight: bold;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -145,6 +156,7 @@ st.sidebar.write("⚙️ *Filters coming soon...*")
 # ------------------ File Upload ------------------
 uploaded_file = st.file_uploader("Upload CSV file with Date, Price", type=["csv"])
 
+
 # ------------------ Functions ------------------
 @st.cache_data
 def load_data(uploaded_file):
@@ -157,42 +169,87 @@ def load_data(uploaded_file):
     return df
 
 def calculate_seasonality(df):
+    # Calculate average daily return by month (using month end)
     monthly_avg = df['Daily Return %'].resample('ME').mean()
+    # Average by month number across years
     monthly_avg_by_month = monthly_avg.groupby(monthly_avg.index.month).mean()
     return monthly_avg_by_month
-    
-def analyze_favorable_times(monthly_avg_by_month):
-    # Get months with positive returns (favorable to buy)
-    favorable_buy_months = monthly_avg_by_month[monthly_avg_by_month > 0].sort_values(ascending=False).index.tolist()
-    # Get months with negative returns (suggest sell)
-    favorable_sell_months = monthly_avg_by_month[monthly_avg_by_month <= 0].sort_values().index.tolist()
 
-    # For demo, take top 3 buy months and bottom 3 sell months
-    buy_months = favorable_buy_months[:3]
-    sell_months = favorable_sell_months[:3]
+def analyze_favorable_times(df, monthly_avg_by_month):
+    # Find favorable buy months (top 3 months with positive avg returns)
+    favorable_buy_months = monthly_avg_by_month[monthly_avg_by_month > 0].sort_values(ascending=False).index.tolist()[:3]
+    # Find favorable sell months (lowest 3 months <= 0)
+    favorable_sell_months = monthly_avg_by_month[monthly_avg_by_month <= 0].sort_values().index.tolist()[:3]
 
-    # Calculate demo return by summing average returns for buy months
-    demo_return_pct = monthly_avg_by_month[buy_months].sum()
+    # Convert to month names
+    buy_month_names = [calendar.month_name[m] for m in favorable_buy_months]
+    sell_month_names = [calendar.month_name[m] for m in favorable_sell_months]
 
-    # Investment amount
-    invested_amount = 100000  # 100k PKR
-    final_amount = invested_amount * (1 + demo_return_pct / 100)
+    # Calculate actual return based on price differences between buy/sell months
+    invested_amount = 100000
+
+    # Get first date of each month present in data
+    months_in_data = df.index.to_period('M').unique().to_timestamp()
+
+    # Helper: find first price on given month (or closest after)
+    def get_first_price_of_month(year, month):
+        try:
+            # Find the first trading day >= month start
+            dt = pd.Timestamp(year=year, month=month, day=1)
+            prices = df.loc[df.index >= dt]['Price']
+            if len(prices) > 0:
+                return prices.iloc[0], prices.index[0]
+            else:
+                return None, None
+        except Exception:
+            return None, None
+
+    # Calculate compound return by simulating buys on buy_months and sells on sell_months in sequence within a year
+    years = sorted(df.index.year.unique())
+    total_return_factor = 1
+
+    for year in years:
+        # For each favorable buy month, find buy price
+        for buy_month in favorable_buy_months:
+            buy_price, buy_date = get_first_price_of_month(year, buy_month)
+            if buy_price is None:
+                continue  # no data for this month/year
+
+            # Find closest sell month after buy month in the year (or next year)
+            sell_price = None
+            for offset in range(1, 13):
+                candidate_month = ((buy_month - 1 + offset) % 12) + 1
+                candidate_year = year + ((buy_month - 1 + offset) // 12)
+                if candidate_month in favorable_sell_months:
+                    sell_price, sell_date = get_first_price_of_month(candidate_year, candidate_month)
+                    if sell_price is not None:
+                        break
+            if sell_price is None:
+                # If no sell month found, assume hold till end of year, use last available price
+                sell_price = df.loc[df.index.year == year]['Price'][-1]
+
+            # Calculate return factor for this cycle
+            cycle_return = sell_price / buy_price
+            total_return_factor *= cycle_return
+
+    final_amount = invested_amount * total_return_factor
     profit = final_amount - invested_amount
+    demo_return_pct = (total_return_factor - 1) * 100
 
-    # Convert month numbers to names
-    buy_month_names = [calendar.month_name[m] for m in buy_months]
-    sell_month_names = [calendar.month_name[m] for m in sell_months]
+    # Determine current month and upcoming favorable buy months
+    today = datetime.today()
+    current_month = today.month
+    upcoming_buy_months = [m for m in favorable_buy_months if m >= current_month]
+    upcoming_buy_names = [calendar.month_name[m] for m in upcoming_buy_months]
 
-    return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount
-    
+    return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount, upcoming_buy_names
+
+
 def format_return_color(percentage):
     if percentage >= 0:
-        return f"<span style='color: green; font-weight: bold;'>{percentage:.2f}%</span>"
+        return f"<span class='return-positive'>{percentage:.2f}%</span>"
     else:
-        return f"<span style='color: red; font-weight: bold;'>{percentage:.2f}%</span>"
-
-
-
+        return f"<span class='return-negative'>{percentage:.2f}%</span>"
 
 def plot_price_chart_plotly(df, stock_name):
     fig = go.Figure()
@@ -211,7 +268,7 @@ def plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=months,
-        y=monthly_avg_by_month.values,
+        y=monthly_avg_by_month.reindex(range(1,13)).values,
         mode='lines+markers',
         line=dict(color='lime', width=2),
         marker=dict(size=8),
@@ -273,21 +330,23 @@ def to_excel(df):
 
 # ------------------ App Logic ------------------
 if uploaded_file:
-    df = load_data(uploaded_file)
-    monthly_avg_by_month = calculate_seasonality(df)
+    # Load and preprocess data
+    df = load_data(uploaded_file)  # expects 'Date' and 'Price' columns
+    monthly_avg_by_month = calculate_seasonality(df)  # seasonality averages by month
 
+    # Create tabs for better UI organization
     tab1, tab2, tab3 = st.tabs(["📈 Charts", "🌡️ Heatmap", "📤 Export Report"])
 
     with tab1:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        plot_price_chart_plotly(df, stock_name)
+        plot_price_chart_plotly(df, stock_name)  # plot raw price data
         st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name)
+        plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name)  # plot seasonality averages
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # --- Favorable time analysis card ---
+        # Favorable time analysis
         buy_months, sell_months, demo_return_pct, profit, final_amount = analyze_favorable_times(monthly_avg_by_month)
 
         st.markdown("---")
@@ -295,13 +354,13 @@ if uploaded_file:
         st.markdown("### 🔍 Favorable Time Analysis & Demo Return")
         st.write(f"**Favorable months to BUY:** {', '.join(buy_months)}")
         st.write(f"**Favorable months to SELL:** {', '.join(sell_months)}")
-        st.write(f"💰 If you invested 100,000 PKR in these favorable months, estimated return would be: **{demo_return_pct:.2f}%**")
+        st.write(f"💰 If you invested 100,000 PKR in these months, estimated return would be: **{demo_return_pct:.2f}%**")
         st.write(f"📈 This means your investment might grow to approximately: **{final_amount:,.0f} PKR** (profit of {profit:,.0f} PKR)")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with tab2:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
-        plot_seasonality_heatmap(df, stock_name)
+        plot_seasonality_heatmap(df, stock_name)  # heatmap for monthly returns by year
         st.markdown("</div>", unsafe_allow_html=True)
 
     with tab3:
@@ -318,3 +377,4 @@ if uploaded_file:
 
 else:
     st.info("Please upload a CSV file with at least 'Date' and 'Price' columns to begin.")
+
