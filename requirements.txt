@@ -1,8 +1,2 @@
-streamlit
-pandas
-matplotlib
-seaborn
-openpyxl
-fpdf
-plotly
-yfinance
+pip install psx-data-reader
+python test_psx_scraper.py
