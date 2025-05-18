@@ -81,7 +81,9 @@ def calculate_seasonality(df):
     return monthly_avg
 
 def get_first_price_of_month(df):
+    df.index = pd.to_datetime(df.index)  # Ensure datetime index
     return df['Price'].resample('MS').first()
+
 
 def analyze_favorable_times(df, monthly_avg):
     buy_months = monthly_avg[monthly_avg > 0].index.tolist()
