@@ -7,6 +7,7 @@ import io
 from datetime import datetime
 import calendar
 
+
 st.set_page_config(page_title="📊 PSX SEASONX", layout="wide", page_icon="📈")
 
 # ------------------ CSS UI Design ------------------
@@ -260,15 +261,14 @@ def format_return_color(percentage):
         return f"<span class='return-negative'>{percentage:.2f}%</span>"
 
 def plot_price_chart_plotly(df, stock_name):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df.index, y=df['Price'], mode='lines', line=dict(color='cyan'), name='Closing Price'))
-    fig.update_layout(
-        title=f'{stock_name} - Closing Price Over Time',
-        xaxis_title='Date',
-        yaxis_title='Price',
-        template='plotly_dark',
-        hovermode='x unified',
-    )
+    # Ensure 'Date' is datetime and 'Price' column exists
+    if 'Date' not in df.columns or 'Price' not in df.columns:
+        st.error("Dataframe must contain 'Date' and 'Price' columns.")
+        return
+
+    df['Date'] = pd.to_datetime(df['Date'])
+    
+    fig = px.line(df, x='Date', y='Price', title=f"Price Chart: {stock_name}")
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_seasonality_chart_plotly(monthly_avg_by_month, stock_name):
