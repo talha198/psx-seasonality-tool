@@ -59,7 +59,40 @@ st.markdown("""
 
 # Show custom-styled uploader with text
 st.markdown('<label class="custom-upload">📂 Browse File</label>', unsafe_allow_html=True)
+# Custom styled file uploader
+st.markdown("""
+    <style>
+    [data-testid="stFileUploader"] > label {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #1E88E5;
+        color: white;
+        padding: 0.75rem 1.25rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 16px;
+        border: 1px solid #1565C0;
+        transition: background-color 0.3s ease;
+    }
+
+    [data-testid="stFileUploader"] > label:hover {
+        background-color: #1565C0;
+    }
+
+    [data-testid="stFileUploader"] > label::after {
+        content: "📂 Browse File";
+    }
+
+    [data-testid="stFileUploader"] span {
+        display: none; /* Hide the default "Drag and drop..." text */
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 uploaded_file = st.file_uploader("", type=["csv"])
+
 
 
 # ------------------ Functions ------------------
