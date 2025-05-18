@@ -233,12 +233,11 @@ def display_seasonality_for_ticker(ticker, start, end):
 
     except Exception as e:
         st.error(f"⚠️ Error for {ticker}: {e}")
-        if st.sidebar.checkbox("Use 5 Predefined PSX Stocks", value=False):
+        if predefined:
     st.header("📌 Predefined PSX Stocks")
-    for ticker in ["TRG.PK", "OGDC.KA", "ENGRO.KA", "HBL.KA", "LUCK.KA"]:
+    for ticker in predefined_tickers:
         display_seasonality_for_ticker(ticker, start_date, end_date)
 else:
-    if custom_ticker:
-        st.header(f"📌 Custom Analysis: {custom_ticker.upper()}")
-        display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
+    st.header(f"📌 Custom Analysis: {custom_ticker.upper()}")
+    display_seasonality_for_ticker(custom_ticker.strip(), start_date, end_date)
 
