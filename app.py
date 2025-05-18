@@ -45,17 +45,18 @@ st.markdown("""
 # --- Sidebar ---
 st.sidebar.title("🔧 Settings & Filters")
 
-stock_ticker = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")
+stock_ticker_input = st.sidebar.text_input("Enter Stock Ticker", value="TRG.PK")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2015-01-01"))
 end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("today"))
 
 st.sidebar.markdown("---")
 st.sidebar.write("⚙️ *Filters coming soon...*")
 
-show_test_data = False
+if "show_test_data" not in st.session_state:
+    st.session_state.show_test_data = False
 
 if st.sidebar.button("Test API with Sample Ticker"):
-    show_test_data = True
+    st.session_state.show_test_data = True
 
 # --- Functions ---
 
@@ -65,7 +66,7 @@ def fetch_stock_data(ticker, start, end):
         raise ValueError("Start date must be before end date.")
     df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
     if df.empty:
-        raise ValueError("No data found for this ticker or date range.")
+        raise ValueError(f"No data found for ticker '{ticker}' or date range.")
     df.reset_index(inplace=True)
     df = df[['Date', 'Close']]
     df.rename(columns={'Close': 'Price'}, inplace=True)
@@ -122,7 +123,6 @@ def analyze_favorable_times(df, monthly_avg):
         'upcoming_buy_names': upcoming_buy_names,
     }
 
-
 def plot_price_chart(df, ticker):
     fig = px.line(df.reset_index(), x='Date', y='Price', title=f"Price Chart: {ticker}")
     fig.update_layout(
@@ -162,55 +162,13 @@ def download_link(df):
     href = f'<a href="data:file/csv;base64,{b64}" download="seasonality_data.csv">📥 Download Seasonality Data as CSV</a>'
     st.markdown(href, unsafe_allow_html=True)
 
-# --- Main ---
-
-if show_test_data:
-    # Show example data for AAPL test
+def display_seasonality_for_ticker(ticker, start, end):
     try:
-        df = fetch_stock_data("AAPL", "2020-01-01", "2020-12-31")
+        df = fetch_stock_data(ticker, start, end)
         monthly_avg = calculate_seasonality(df)
         results = analyze_favorable_times(df, monthly_avg)
 
-        st.subheader(f"📈 Seasonality Summary for AAPL (Test Data)")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Favorable Buy Months:** {', '.join(results['buy_month_names']) if results['buy_month_names'] else 'None'}")
-            st.markdown(f"**Favorable Sell Months:** {', '.join(results['sell_month_names']) if results['sell_month_names'] else 'None'}")
-            st.markdown(f"**Upcoming Favorable Buy Months:** {', '.join(results['upcoming_buy_names']) if results['upcoming_buy_names'] else 'None'}")
-        with col2:
-            simple_class = "return-positive" if results['simple_return_pct'] >= 0 else "return-negative"
-            st.markdown(f"<span class='{simple_class}'>Demo Return (Simple Sum): {results['simple_return_pct']:.2f}%</span>", unsafe_allow_html=True)
-            st.markdown(f"Profit on 100,000 PKR: {results['simple_profit']:.2f} PKR")
-
-            compound_class = "return-positive" if results['compound_return_pct'] >= 0 else "return-negative"
-            st.markdown(f"<span class='{compound_class}'>Compound Return (Simulated): {results['compound_return_pct']:.2f}%</span>", unsafe_allow_html=True)
-            st.markdown(f"Profit on 100,000 PKR: {results['compound_profit']:.2f} PKR")
-
-        st.markdown("---")
-        st.markdown("### Price Chart")
-        plot_price_chart(df, "AAPL")
-
-        st.markdown("### Seasonality Chart")
-        plot_seasonality_chart(monthly_avg, "AAPL")
-
-        monthly_df = monthly_avg.rename_axis('Month').reset_index()
-        monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
-        monthly_df = monthly_df[['Month', 'Month_Name', 'Daily Return %']]
-        monthly_df.rename(columns={'Daily Return %': 'Avg Monthly Return (%)'}, inplace=True)
-        download_link(monthly_df)
-
-    except Exception as e:
-        st.error(f"Error fetching AAPL test data: {e}")
-
-elif stock_ticker.strip():
-    # User input ticker mode
-    try:
-        df = fetch_stock_data(stock_ticker, start_date, end_date)
-        monthly_avg = calculate_seasonality(df)
-        results = analyze_favorable_times(df, monthly_avg)
-
-        st.subheader(f"📈 Seasonality Summary for {stock_ticker.upper()}")
+        st.subheader(f"📈 Seasonality Summary for {ticker.upper()}")
 
         col1, col2 = st.columns(2)
 
@@ -231,10 +189,47 @@ elif stock_ticker.strip():
         st.markdown("---")
 
         st.markdown("### Price Chart")
-        plot_price_chart(df, stock_ticker)
+        plot_price_chart(df, ticker)
 
         st.markdown("### Seasonality Chart")
-        plot_seasonality_chart(monthly_avg, stock_ticker)
+        plot_seasonality_chart(monthly_avg, ticker)
+
+        # --- Forward-looking Seasonality Forecast ---
+        st.markdown("### 🔮 Forward-Looking Seasonality Forecast (Next 6 Months)")
+
+        today_month = datetime.today().month
+        next_6_months = [(today_month + i - 1) % 12 + 1 for i in range(6)]
+        forecast_returns = monthly_avg.reindex(next_6_months).fillna(0).values
+        forecast_month_names = [calendar.month_name[m] for m in next_6_months]
+
+        forecast_df = pd.DataFrame({
+            'Month': forecast_month_names,
+            'Avg Monthly Return (%)': forecast_returns
+        })
+
+        # Show forecast table
+        st.table(forecast_df.style.applymap(
+            lambda v: 'color: #32CD32;' if v >= 0 else 'color: #FF6347;', subset=['Avg Monthly Return (%)']
+        ))
+
+        # Plot forecast chart
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=forecast_month_names,
+            y=forecast_returns,
+            marker_color=['lime' if x >= 0 else 'tomato' for x in forecast_returns],
+            name='Forecasted Avg Monthly Return %'
+        ))
+        fig.update_layout(
+            title=f"Forward-Looking Seasonality Forecast: {ticker}",
+            xaxis_title="Month",
+            yaxis_title="Average Monthly Return (%)",
+            plot_bgcolor="#0e1117",
+            paper_bgcolor="#0e1117",
+            font=dict(color="#fafafa"),
+            yaxis=dict(ticksuffix="%")
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
         monthly_df = monthly_avg.rename_axis('Month').reset_index()
         monthly_df['Month_Name'] = monthly_df['Month'].apply(lambda x: calendar.month_name[x])
@@ -243,14 +238,12 @@ elif stock_ticker.strip():
         download_link(monthly_df)
 
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        st.error(f"Error fetching data for {ticker}: {e}")
 
+# --- Main Execution ---
+
+if st.session_state.show_test_data:
+    display_seasonality_for_ticker("TRG.PK", pd.to_datetime("2015-01-01"), pd.to_datetime("today"))
 else:
-    st.info("Enter a stock ticker symbol (e.g. TRG.PK) in the sidebar to get started.")
-
-# --- Footer ---
-st.markdown("""
-<div style='text-align:center; margin-top:3rem; color:#666; font-size:12px;'>
-    © 2025 PSX SEASONX | Developed by YourName
-</div>
-""", unsafe_allow_html=True)
+    if stock_ticker_input:
+        display_seasonality_for_ticker(stock_ticker_input.strip(), start_date, end_date)
