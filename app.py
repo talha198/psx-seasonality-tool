@@ -184,6 +184,13 @@ def analyze_favorable_times(monthly_avg_by_month):
     sell_month_names = [calendar.month_name[m] for m in sell_months]
 
     return buy_month_names, sell_month_names, demo_return_pct, profit, final_amount
+    
+def format_return_color(percentage):
+    if percentage >= 0:
+        return f"<span style='color: green; font-weight: bold;'>{percentage:.2f}%</span>"
+    else:
+        return f"<span style='color: red; font-weight: bold;'>{percentage:.2f}%</span>"
+
 
 
 
