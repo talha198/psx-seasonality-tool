@@ -1,2 +1,4 @@
-pip install psx-data-reader
-python test_psx_scraper.py
+git+https://github.com/MuhammadAmir5670/psx-data-reader.git
+streamlit
+pandas
+plotly
